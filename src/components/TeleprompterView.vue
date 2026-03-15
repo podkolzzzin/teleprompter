@@ -644,6 +644,14 @@ watch(speed, () => {
   pointer-events: none;
 }
 
+.tp-root.mirrored .frame-edit-overlay {
+  transform: scaleX(-1);
+}
+
+.tp-root.mirrored .frame-instructions {
+  transform: scaleX(-1);
+}
+
 .frame-box {
   position: absolute;
   top: 0;
