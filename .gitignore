@@ -1,3 +1,6 @@
+# Skills symlinks (skills are in .agents/skills/)
+skills/
+
 # Logs
 logs
 *.log
