@@ -81,6 +81,15 @@
           ↔ Mirror
         </button>
 
+        <button
+          class="ctrl-btn share-btn"
+          :class="{ active: remoteConnected }"
+          @click="openShareModal"
+          title="Share remote control"
+        >
+          📲 Share
+        </button>
+
         <button class="ctrl-btn hide-btn" @click="controlsHidden = !controlsHidden" title="Toggle controls">
           {{ controlsHidden ? '⚙' : '✕' }}
         </button>
@@ -95,6 +104,13 @@
       ⚙
     </button>
 
+    <ShareModal
+      v-if="showShareModal"
+      :shareUrl="shareUrl"
+      :connected="remoteConnected"
+      @close="showShareModal = false"
+    />
+
     <div v-if="loading" class="loading">Loading…</div>
   </div>
 </template>
@@ -104,6 +120,8 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { marked } from 'marked'
 import { getScript } from '../storage/db'
+import ShareModal from './ShareModal.vue'
+import { useRemoteHost, type RemoteCommand } from '../composables/useRemoteControl'
 
 const router = useRouter()
 const route = useRoute()
@@ -118,10 +136,44 @@ const controlsHidden = ref(false)
 const editingFrame = ref(false)
 const areaWidth = ref(900)
 const areaOffsetX = ref(0)
+const showShareModal = ref(false)
 
 const scrollEl = ref<HTMLElement | null>(null)
 let rafId: number | null = null
 let lastTime: number | null = null
+
+function handleRemoteCommand(cmd: RemoteCommand) {
+  if (cmd.type === 'togglePlay') togglePlay()
+  else if (cmd.type === 'speedUp') speed.value = Math.min(20, speed.value + 1)
+  else if (cmd.type === 'speedDown') speed.value = Math.max(1, speed.value - 1)
+  else if (cmd.type === 'fontUp') fontSize.value = Math.min(96, fontSize.value + 4)
+  else if (cmd.type === 'fontDown') fontSize.value = Math.max(24, fontSize.value - 4)
+  else if (cmd.type === 'toggleMirror') mirror.value = !mirror.value
+  else if (cmd.type === 'reset' && scrollEl.value) scrollEl.value.scrollTop = 0
+}
+
+const { peerId, connected: remoteConnected, init: initRemoteHost, broadcastState } =
+  useRemoteHost(handleRemoteCommand)
+
+const shareUrl = computed(() => {
+  if (!peerId.value) return ''
+  return `${window.location.origin}/remote/${peerId.value}`
+})
+
+function openShareModal() {
+  if (!peerId.value) initRemoteHost()
+  showShareModal.value = true
+}
+
+// Broadcast state changes to remote controllers
+watch([playing, speed, fontSize, mirror], () => {
+  broadcastState({
+    playing: playing.value,
+    speed: speed.value,
+    fontSize: fontSize.value,
+    mirror: mirror.value,
+  })
+})
 
 const renderedContent = computed(() => {
   return marked.parse(rawContent.value || '') as string
@@ -386,6 +438,12 @@ watch(speed, () => {
 }
 
 .mirror-btn.active {
+  background: rgba(74, 222, 128, 0.25);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.share-btn.active {
   background: rgba(74, 222, 128, 0.25);
   border-color: var(--accent);
   color: var(--accent);
