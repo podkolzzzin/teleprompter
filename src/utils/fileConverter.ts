@@ -5,7 +5,10 @@ import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 
 GlobalWorkerOptions.workerSrc = pdfjsWorker
 
+GlobalWorkerOptions.workerSrc = pdfjsWorker
+
 const SUPPORTED_EXTENSIONS = ['.docx', '.pdf']
+const turndownService = new TurndownService({ headingStyle: 'atx' })
 
 export interface FileConversionResult {
   title: string
@@ -25,8 +28,7 @@ function getFileTitle(name: string): string {
 async function convertDocxToMarkdown(file: File): Promise<string> {
   const arrayBuffer = await file.arrayBuffer()
   const result = await mammoth.convertToHtml({ arrayBuffer })
-  const turndown = new TurndownService({ headingStyle: 'atx' })
-  return turndown.turndown(result.value)
+  return turndownService.turndown(result.value)
 }
 
 async function convertPdfToMarkdown(file: File): Promise<string> {
