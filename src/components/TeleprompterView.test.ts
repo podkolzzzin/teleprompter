@@ -147,4 +147,198 @@ describe('TeleprompterView', () => {
     await wrapper.find('.hide-btn').trigger('click')
     expect(wrapper.find('.tp-root').classes()).toContain('controls-hidden')
   })
+
+  it('renders focus overlay', async () => {
+    vi.mocked(getScript).mockResolvedValue({
+      id: 1,
+      title: 'Test',
+      content: 'Content',
+      createdAt: 1000,
+      updatedAt: 1000,
+    })
+
+    const router = createTestRouter()
+    await router.isReady()
+
+    const wrapper = mount(TeleprompterView, {
+      global: { plugins: [router] },
+    })
+
+    await vi.waitFor(() => {
+      expect(wrapper.find('.loading').exists()).toBe(false)
+    })
+
+    expect(wrapper.find('.focus-overlay').exists()).toBe(true)
+  })
+
+  it('renders horizontal lines under headers', async () => {
+    vi.mocked(getScript).mockResolvedValue({
+      id: 1,
+      title: 'Test',
+      content: '# Heading 1\n## Heading 2\n### Heading 3',
+      createdAt: 1000,
+      updatedAt: 1000,
+    })
+
+    const router = createTestRouter()
+    await router.isReady()
+
+    const wrapper = mount(TeleprompterView, {
+      global: { plugins: [router] },
+    })
+
+    await vi.waitFor(() => {
+      expect(wrapper.find('.tp-content').html()).toContain('<h1')
+      expect(wrapper.find('.tp-content').html()).toContain('<h2')
+      expect(wrapper.find('.tp-content').html()).toContain('<h3')
+    })
+  })
+
+  it('toggles frame edit mode via button', async () => {
+    vi.mocked(getScript).mockResolvedValue({
+      id: 1,
+      title: 'Test',
+      content: 'Content',
+      createdAt: 1000,
+      updatedAt: 1000,
+    })
+
+    const router = createTestRouter()
+    await router.isReady()
+
+    const wrapper = mount(TeleprompterView, {
+      global: { plugins: [router] },
+    })
+
+    await vi.waitFor(() => {
+      expect(wrapper.find('.loading').exists()).toBe(false)
+    })
+
+    expect(wrapper.find('.frame-edit-overlay').exists()).toBe(false)
+
+    await wrapper.find('.frame-btn').trigger('click')
+    expect(wrapper.find('.frame-edit-overlay').exists()).toBe(true)
+    expect(wrapper.find('.frame-btn').classes()).toContain('active')
+
+    await wrapper.find('.frame-btn').trigger('click')
+    expect(wrapper.find('.frame-edit-overlay').exists()).toBe(false)
+  })
+
+  it('toggles mirror mode via M key', async () => {
+    vi.mocked(getScript).mockResolvedValue({
+      id: 1,
+      title: 'Test',
+      content: 'Content',
+      createdAt: 1000,
+      updatedAt: 1000,
+    })
+
+    const router = createTestRouter()
+    await router.isReady()
+
+    const wrapper = mount(TeleprompterView, {
+      global: { plugins: [router] },
+    })
+
+    await vi.waitFor(() => {
+      expect(wrapper.find('.loading').exists()).toBe(false)
+    })
+
+    expect(wrapper.find('.tp-root').classes()).not.toContain('mirrored')
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'm' }))
+    await wrapper.vm.$nextTick()
+    expect(wrapper.find('.tp-root').classes()).toContain('mirrored')
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'm' }))
+    await wrapper.vm.$nextTick()
+    expect(wrapper.find('.tp-root').classes()).not.toContain('mirrored')
+  })
+
+  it('toggles controls visibility via H key', async () => {
+    vi.mocked(getScript).mockResolvedValue({
+      id: 1,
+      title: 'Test',
+      content: 'Content',
+      createdAt: 1000,
+      updatedAt: 1000,
+    })
+
+    const router = createTestRouter()
+    await router.isReady()
+
+    const wrapper = mount(TeleprompterView, {
+      global: { plugins: [router] },
+    })
+
+    await vi.waitFor(() => {
+      expect(wrapper.find('.loading').exists()).toBe(false)
+    })
+
+    expect(wrapper.find('.tp-root').classes()).not.toContain('controls-hidden')
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'h' }))
+    await wrapper.vm.$nextTick()
+    expect(wrapper.find('.tp-root').classes()).toContain('controls-hidden')
+  })
+
+  it('toggles frame edit mode via F key', async () => {
+    vi.mocked(getScript).mockResolvedValue({
+      id: 1,
+      title: 'Test',
+      content: 'Content',
+      createdAt: 1000,
+      updatedAt: 1000,
+    })
+
+    const router = createTestRouter()
+    await router.isReady()
+
+    const wrapper = mount(TeleprompterView, {
+      global: { plugins: [router] },
+    })
+
+    await vi.waitFor(() => {
+      expect(wrapper.find('.loading').exists()).toBe(false)
+    })
+
+    expect(wrapper.find('.frame-edit-overlay').exists()).toBe(false)
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'f' }))
+    await wrapper.vm.$nextTick()
+    expect(wrapper.find('.frame-edit-overlay').exists()).toBe(true)
+  })
+
+  it('adjusts font size via ArrowLeft/ArrowRight keys', async () => {
+    vi.mocked(getScript).mockResolvedValue({
+      id: 1,
+      title: 'Test',
+      content: 'Content',
+      createdAt: 1000,
+      updatedAt: 1000,
+    })
+
+    const router = createTestRouter()
+    await router.isReady()
+
+    const wrapper = mount(TeleprompterView, {
+      global: { plugins: [router] },
+    })
+
+    await vi.waitFor(() => {
+      expect(wrapper.find('.loading').exists()).toBe(false)
+    })
+
+    // Default font size is 48px
+    const scrollEl = wrapper.find('.tp-scroll')
+    expect(scrollEl.attributes('style')).toContain('font-size: 48px')
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { code: 'ArrowRight', key: 'ArrowRight' }))
+    await wrapper.vm.$nextTick()
+    expect(scrollEl.attributes('style')).toContain('font-size: 52px')
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { code: 'ArrowLeft', key: 'ArrowLeft' }))
+    await wrapper.vm.$nextTick()
+    expect(scrollEl.attributes('style')).toContain('font-size: 48px')
+  })
 })

@@ -1,13 +1,27 @@
 <template>
   <div class="tp-root" :class="{ mirrored: mirror, 'controls-hidden': controlsHidden }">
+    <!-- Focus gradient overlay -->
+    <div class="focus-overlay"></div>
+
+    <!-- Frame edit overlay -->
+    <div v-if="editingFrame" class="frame-edit-overlay">
+      <div class="frame-box" :style="frameBoxStyle">
+        <div class="frame-handle frame-handle-left" @pointerdown.prevent="onFramePointerDown('resize-left', $event)"></div>
+        <div class="frame-handle frame-handle-right" @pointerdown.prevent="onFramePointerDown('resize-right', $event)"></div>
+        <div class="frame-move-zone" @pointerdown.prevent="onFramePointerDown('move', $event)">
+          <div class="frame-instructions">↔ Drag to move · Drag edges to resize</div>
+        </div>
+      </div>
+    </div>
+
     <!-- Scrolling content area -->
     <div
       ref="scrollEl"
       class="tp-scroll"
       :style="{ fontSize: fontSize + 'px' }"
-      @click="togglePlay"
+      @click="onScrollClick"
     >
-      <div class="tp-content prose" v-html="renderedContent"></div>
+      <div class="tp-content prose" :style="contentAreaStyle" v-html="renderedContent"></div>
       <div class="tp-spacer"></div>
     </div>
 
@@ -50,10 +64,19 @@
         </div>
 
         <button
+          class="ctrl-btn frame-btn"
+          :class="{ active: editingFrame }"
+          @click="editingFrame = !editingFrame"
+          title="Edit prompter frame (F)"
+        >
+          ⬜ Frame
+        </button>
+
+        <button
           class="ctrl-btn mirror-btn"
           :class="{ active: mirror }"
           @click="mirror = !mirror"
-          title="Mirror mode"
+          title="Mirror mode (M)"
         >
           ↔ Mirror
         </button>
@@ -92,6 +115,9 @@ const speed = ref(5)
 const fontSize = ref(48)
 const mirror = ref(false)
 const controlsHidden = ref(false)
+const editingFrame = ref(false)
+const areaWidth = ref(900)
+const areaOffsetX = ref(0)
 
 const scrollEl = ref<HTMLElement | null>(null)
 let rafId: number | null = null
@@ -100,6 +126,16 @@ let lastTime: number | null = null
 const renderedContent = computed(() => {
   return marked.parse(rawContent.value || '') as string
 })
+
+const contentAreaStyle = computed(() => ({
+  maxWidth: `${areaWidth.value}px`,
+  marginLeft: `calc(50% - ${areaWidth.value / 2}px + ${areaOffsetX.value}px)`,
+}))
+
+const frameBoxStyle = computed(() => ({
+  left: `calc(50% - ${areaWidth.value / 2}px + ${areaOffsetX.value}px)`,
+  width: `${areaWidth.value}px`,
+}))
 
 onMounted(async () => {
   const id = Number(route.params.id)
@@ -116,6 +152,8 @@ onMounted(async () => {
 onUnmounted(() => {
   stopScroll()
   window.removeEventListener('keydown', handleKey)
+  document.removeEventListener('pointermove', onFramePointerMove)
+  document.removeEventListener('pointerup', onFramePointerUp)
 })
 
 function togglePlay() {
@@ -174,7 +212,79 @@ function handleKey(e: KeyboardEvent) {
   } else if (e.code === 'ArrowDown') {
     e.preventDefault()
     speed.value = Math.max(1, speed.value - 1)
+  } else if (e.code === 'ArrowLeft') {
+    e.preventDefault()
+    fontSize.value = Math.max(24, fontSize.value - 4)
+  } else if (e.code === 'ArrowRight') {
+    e.preventDefault()
+    fontSize.value = Math.min(96, fontSize.value + 4)
+  } else if (e.key === 'm' || e.key === 'M') {
+    mirror.value = !mirror.value
+  } else if (e.key === 'h' || e.key === 'H') {
+    controlsHidden.value = !controlsHidden.value
+  } else if (e.key === 'f' || e.key === 'F') {
+    editingFrame.value = !editingFrame.value
+  } else if (e.key === 'r' || e.key === 'R') {
+    if (scrollEl.value) scrollEl.value.scrollTop = 0
+  } else if (e.code === 'Escape') {
+    if (editingFrame.value) {
+      editingFrame.value = false
+    } else {
+      router.push('/')
+    }
   }
+}
+
+function onScrollClick() {
+  if (!editingFrame.value) togglePlay()
+}
+
+// Frame drag/resize
+type FrameAction = 'move' | 'resize-left' | 'resize-right'
+let frameAction: FrameAction | null = null
+let frameStartX = 0
+let frameStartWidth = 0
+let frameStartOffsetX = 0
+
+function clamp(value: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, value))
+}
+
+function clampOffset(offset: number, width: number) {
+  const maxOffset = Math.max(0, (window.innerWidth - width) / 2)
+  return clamp(offset, -maxOffset, maxOffset)
+}
+
+function onFramePointerDown(action: FrameAction, e: PointerEvent) {
+  frameAction = action
+  frameStartX = e.clientX
+  frameStartWidth = areaWidth.value
+  frameStartOffsetX = areaOffsetX.value
+  document.addEventListener('pointermove', onFramePointerMove)
+  document.addEventListener('pointerup', onFramePointerUp)
+}
+
+function onFramePointerMove(e: PointerEvent) {
+  if (!frameAction) return
+  const dx = e.clientX - frameStartX
+
+  if (frameAction === 'move') {
+    areaOffsetX.value = clampOffset(frameStartOffsetX + dx, areaWidth.value)
+  } else if (frameAction === 'resize-left') {
+    const newWidth = clamp(frameStartWidth - dx, 300, window.innerWidth)
+    areaWidth.value = newWidth
+    areaOffsetX.value = clampOffset(frameStartOffsetX + (frameStartWidth - newWidth) / 2, newWidth)
+  } else if (frameAction === 'resize-right') {
+    const newWidth = clamp(frameStartWidth + dx, 300, window.innerWidth)
+    areaWidth.value = newWidth
+    areaOffsetX.value = clampOffset(frameStartOffsetX + (newWidth - frameStartWidth) / 2, newWidth)
+  }
+}
+
+function onFramePointerUp() {
+  frameAction = null
+  document.removeEventListener('pointermove', onFramePointerMove)
+  document.removeEventListener('pointerup', onFramePointerUp)
 }
 
 // Restart RAF when speed changes while playing
@@ -356,6 +466,115 @@ watch(speed, () => {
   z-index: 30;
 }
 
+/* Focus gradient overlay - dims top/bottom, highlights center */
+.focus-overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 10;
+  background: linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0.6) 0%,
+    rgba(0, 0, 0, 0.15) 25%,
+    transparent 40%,
+    transparent 60%,
+    rgba(0, 0, 0, 0.15) 75%,
+    rgba(0, 0, 0, 0.6) 100%
+  );
+}
+
+.focus-overlay::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 1px;
+  background: rgba(74, 222, 128, 0.15);
+}
+
+/* Frame edit overlay */
+.frame-edit-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 15;
+  pointer-events: none;
+}
+
+.frame-box {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border: 2px dashed rgba(74, 222, 128, 0.5);
+  border-radius: 4px;
+}
+
+.frame-handle {
+  pointer-events: auto;
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 44px;
+  cursor: ew-resize;
+  touch-action: none;
+  background: rgba(74, 222, 128, 0.08);
+  transition: background 0.2s;
+}
+
+.frame-handle:hover,
+.frame-handle:active {
+  background: rgba(74, 222, 128, 0.2);
+}
+
+.frame-handle::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 4px;
+  height: 40px;
+  border-radius: 2px;
+  background: rgba(74, 222, 128, 0.5);
+}
+
+.frame-handle-left {
+  left: -22px;
+}
+
+.frame-handle-right {
+  right: -22px;
+}
+
+.frame-move-zone {
+  pointer-events: auto;
+  position: absolute;
+  inset: 0;
+  cursor: move;
+  touch-action: none;
+  z-index: -1;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 40px;
+}
+
+.frame-instructions {
+  background: rgba(0, 0, 0, 0.7);
+  color: rgba(255, 255, 255, 0.7);
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.frame-btn.active {
+  background: rgba(74, 222, 128, 0.25);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 .loading {
   position: fixed;
   inset: 0;
@@ -374,6 +593,8 @@ watch(speed, () => {
   color: #fff;
   margin: 0.6em 0 0.3em;
   line-height: 1.3;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  padding-bottom: 0.3em;
 }
 .prose :deep(h1) { font-size: 1.4em; }
 .prose :deep(h2) { font-size: 1.2em; }
