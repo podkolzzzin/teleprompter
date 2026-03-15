@@ -173,4 +173,60 @@ test.describe('Teleprompter controls', () => {
     await page.locator('.tp-scroll').click()
     await expect(page.getByTitle('Play')).toBeVisible()
   })
+
+  test('frame editor overlay mirrors when mirror mode is active', async ({ page }) => {
+    // Enable mirror mode
+    await page.getByTitle('Mirror mode (M)').click()
+    await expect(page.locator('.tp-root')).toHaveClass(/mirrored/)
+
+    // Open frame editor
+    await page.getByTitle('Edit prompter frame (F)').click()
+    await expect(page.locator('.frame-edit-overlay')).toBeVisible()
+
+    // The frame overlay should have scaleX(-1) when mirrored
+    const overlayTransform = await page.locator('.frame-edit-overlay').evaluate(
+      (el) => getComputedStyle(el).transform
+    )
+    // scaleX(-1) results in a matrix with -1 in m11 position: matrix(-1, 0, 0, 1, 0, 0)
+    expect(overlayTransform).toContain('-1')
+  })
+
+  test('frame editor drag works correctly in mirror mode', async ({ page }) => {
+    // Enable mirror and frame editor
+    await page.getByTitle('Mirror mode (M)').click()
+    await expect(page.locator('.tp-root')).toHaveClass(/mirrored/)
+    await page.getByTitle('Edit prompter frame (F)').click()
+    await expect(page.locator('.frame-edit-overlay')).toBeVisible()
+
+    // Get initial content position
+    const getContentMarginLeft = () =>
+      page.locator('.tp-content').evaluate((el) => parseFloat(getComputedStyle(el).marginLeft))
+
+    const initialMargin = await getContentMarginLeft()
+
+    // Drag the frame move zone to the right
+    const moveZone = page.locator('.frame-move-zone')
+    const box = await moveZone.boundingBox()
+    expect(box).not.toBeNull()
+
+    await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2)
+    await page.mouse.down()
+    await page.mouse.move(box!.x + box!.width / 2 + 100, box!.y + box!.height / 2, { steps: 5 })
+    await page.mouse.up()
+
+    // After dragging right in mirror mode, the internal offset should decrease
+    // (because dx is negated), so the content marginLeft should change
+    const newMargin = await getContentMarginLeft()
+    expect(newMargin).not.toEqual(initialMargin)
+
+    // Verify the frame box and content are visually aligned:
+    // The frame-box left (after CSS mirror) should match the content visual position
+    const frameBox = page.locator('.frame-box')
+    const frameRect = await frameBox.boundingBox()
+    const contentRect = await page.locator('.tp-content').boundingBox()
+    expect(frameRect).not.toBeNull()
+    expect(contentRect).not.toBeNull()
+    // Frame width should match content max-width (within 10px tolerance for padding)
+    expect(Math.abs(frameRect!.width - contentRect!.width)).toBeLessThan(10)
+  })
 })
