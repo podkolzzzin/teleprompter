@@ -250,6 +250,11 @@ function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value))
 }
 
+function clampOffset(offset: number, width: number) {
+  const maxOffset = Math.max(0, (window.innerWidth - width) / 2)
+  return clamp(offset, -maxOffset, maxOffset)
+}
+
 function onFramePointerDown(action: FrameAction, e: PointerEvent) {
   frameAction = action
   frameStartX = e.clientX
@@ -264,15 +269,15 @@ function onFramePointerMove(e: PointerEvent) {
   const dx = e.clientX - frameStartX
 
   if (frameAction === 'move') {
-    areaOffsetX.value = clamp(frameStartOffsetX + dx, -window.innerWidth / 2, window.innerWidth / 2)
+    areaOffsetX.value = clampOffset(frameStartOffsetX + dx, areaWidth.value)
   } else if (frameAction === 'resize-left') {
     const newWidth = clamp(frameStartWidth - dx, 300, window.innerWidth)
     areaWidth.value = newWidth
-    areaOffsetX.value = frameStartOffsetX + (frameStartWidth - newWidth) / 2
+    areaOffsetX.value = clampOffset(frameStartOffsetX + (frameStartWidth - newWidth) / 2, newWidth)
   } else if (frameAction === 'resize-right') {
     const newWidth = clamp(frameStartWidth + dx, 300, window.innerWidth)
     areaWidth.value = newWidth
-    areaOffsetX.value = frameStartOffsetX + (newWidth - frameStartWidth) / 2
+    areaOffsetX.value = clampOffset(frameStartOffsetX + (newWidth - frameStartWidth) / 2, newWidth)
   }
 }
 
