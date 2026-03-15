@@ -116,29 +116,187 @@ test.describe('Mobile teleprompter workflow', () => {
     await expect(page.getByTitle('Toggle controls')).toBeVisible()
   })
 
-  test('full workflow: create, preview, save, teleprompter, and back', async ({ page }) => {
+  test('full mobile workflow: create, edit, preview, teleprompter with all controls, and navigation', async ({ page }) => {
     const consoleErrors: string[] = []
     page.on('console', (msg) => {
       if (msg.type() === 'error') consoleErrors.push(msg.text())
     })
     page.on('pageerror', (err) => consoleErrors.push(err.message))
 
-    // Start teleprompter from existing script
+    // ── 1. Edit the existing script to add richer content ──
+    await page.getByRole('button', { name: '✏ Edit' }).click()
+    await expect(page).toHaveURL(/\/edit\/\d+/)
+    await expect(page.getByLabel('Title')).toHaveValue('Mobile Demo Script')
+
+    const richContent =
+      '# Mobile Broadcast\n\n' +
+      'Welcome to our **live mobile broadcast**.\n\n' +
+      '## Opening Segment\n\n' +
+      'The host opens with a warm greeting to the audience.\n\n' +
+      '> "Every great story begins with a single word."\n\n' +
+      '## Main Topic\n\n' +
+      'Today we discuss the following key points:\n\n' +
+      '- First point: technology trends\n' +
+      '- Second point: mobile innovation\n' +
+      '- Third point: future predictions\n' +
+      '- Fourth point: audience interaction\n\n' +
+      '## Interview Segment\n\n' +
+      'Our guest shares insights on *creative storytelling*.\n\n' +
+      'The conversation covers multiple aspects of modern communication.\n\n' +
+      '## Closing Remarks\n\n' +
+      'Thank you for joining us on this mobile broadcast.\n\n' +
+      '*— End of Broadcast —*'
+
+    await page.getByLabel('Title').fill('Mobile Broadcast Demo')
+    await page.getByLabel('Content (Markdown)').fill(richContent)
+
+    // Preview the markdown
+    await page.getByRole('button', { name: 'Preview' }).click()
+    await expect(page.locator('.preview-body')).toContainText('Mobile Broadcast')
+    await expect(page.locator('.preview-body')).toContainText('great story begins')
+    await page.getByRole('button', { name: 'Hide Preview' }).click()
+
+    // Save
+    await page.getByRole('button', { name: 'Save' }).click()
+    await expect(page).toHaveURL('/')
+    await expect(page.getByText('Mobile Broadcast Demo')).toBeVisible()
+
+    // ── 2. Launch teleprompter ──
     await page.getByRole('button', { name: '▶ Start' }).click()
     await expect(page).toHaveURL(/\/teleprompter\/\d+/)
+    await expect(page.locator('.tp-content')).toContainText('Mobile Broadcast')
 
-    // Play and wait for scrolling to progress
+    // ── 3. Increase speed and font size ──
+    await page.getByTitle('Scroll speed').fill('8')
+    await expect(page.locator('.ctrl-group').first().locator('.ctrl-value')).toContainText('8')
+
+    await page.getByTitle('Font size').fill('56')
+    await expect(page.locator('.ctrl-group').nth(1).locator('.ctrl-value')).toContainText('56px')
+
+    // ── 4. Play and let it scroll ──
     await page.getByTitle('Play').click()
     await expect(page.getByTitle('Pause')).toBeVisible()
+    await expect(page.locator('.tap-hint')).toContainText('Tap text to pause')
+
     await page.waitForFunction(() => {
       const el = document.querySelector('.tp-scroll')
-      return el && el.scrollTop > 0
+      return el && el.scrollTop > 80
     })
 
-    // Pause and go back
+    // Pause by tapping content
+    await page.locator('.tp-scroll').click()
+    await expect(page.getByTitle('Play')).toBeVisible()
+
+    // ── 5. Enable mirror mode and scroll more ──
+    await page.getByTitle('Mirror mode (M)').click()
+    await expect(page.locator('.tp-root')).toHaveClass(/mirrored/)
+
+    await page.getByTitle('Play').click()
+    await page.waitForFunction(() => {
+      const el = document.querySelector('.tp-scroll')
+      return el && el.scrollTop > 150
+    })
+    await page.getByTitle('Pause').click()
+
+    // Disable mirror
+    await page.getByTitle('Mirror mode (M)').click()
+    await expect(page.locator('.tp-root')).not.toHaveClass(/mirrored/)
+
+    // ── 6. Open and close frame editor ──
+    await page.getByTitle('Edit prompter frame (F)').click()
+    await expect(page.locator('.frame-edit-overlay')).toBeVisible()
+    await page.getByTitle('Edit prompter frame (F)').click()
+    await expect(page.locator('.frame-edit-overlay')).not.toBeVisible()
+
+    // ── 7. Hide controls, show again ──
+    await page.getByTitle('Toggle controls').click()
+    await expect(page.locator('.show-controls-btn')).toBeVisible()
+    await page.locator('.show-controls-btn').click()
+    await expect(page.locator('.tp-root')).not.toHaveClass(/controls-hidden/)
+
+    // ── 8. Change settings again and do final scroll ──
+    await page.getByTitle('Scroll speed').fill('15')
+    await page.getByTitle('Font size').fill('40')
+    await page.getByTitle('Play').click()
+    await page.waitForFunction(() => {
+      const el = document.querySelector('.tp-scroll')
+      return el && el.scrollTop > 200
+    })
+    await page.getByTitle('Pause').click()
+
+    // ── 9. Navigate back ──
+    await page.getByTitle('Back').click()
+    await expect(page).toHaveURL('/')
+    await expect(page.getByText('Mobile Broadcast Demo')).toBeVisible()
+
+    expect(consoleErrors, 'Expected no browser console errors').toEqual([])
+  })
+
+  test('mobile multi-script workflow: create two scripts and switch between them', async ({ page }) => {
+    const consoleErrors: string[] = []
+    page.on('console', (msg) => {
+      if (msg.type() === 'error') consoleErrors.push(msg.text())
+    })
+    page.on('pageerror', (err) => consoleErrors.push(err.message))
+
+    // ── 1. Create a second script ──
+    await page.getByRole('button', { name: '+ New Script' }).click()
+    await page.getByLabel('Title').fill('Second Mobile Script')
+    await page.getByLabel('Content (Markdown)').fill(
+      '# Second Script\n\n' +
+        'This is the **second** script for mobile testing.\n\n' +
+        '## Part One\n\n' +
+        'Content for the second teleprompter session.\n\n' +
+        '## Part Two\n\n' +
+        'More paragraphs to ensure proper scrolling behavior.\n\n' +
+        'Additional lines of text for the second script.\n\n' +
+        '*— End —*'
+    )
+    await page.getByRole('button', { name: 'Save' }).click()
+    await expect(page).toHaveURL('/')
+    await expect(page.locator('.script-card')).toHaveCount(2)
+
+    // ── 2. Launch first script (most recent = Second Mobile Script) ──
+    const startBtns = page.getByRole('button', { name: '▶ Start' })
+    await startBtns.first().click()
+    await expect(page).toHaveURL(/\/teleprompter\/\d+/)
+    await expect(page.locator('.tp-content')).toContainText('Second Script')
+
+    // Play with fast speed
+    await page.getByTitle('Scroll speed').fill('14')
+    await page.getByTitle('Play').click()
+    await page.waitForFunction(() => {
+      const el = document.querySelector('.tp-scroll')
+      return el && el.scrollTop > 60
+    })
     await page.getByTitle('Pause').click()
     await page.getByTitle('Back').click()
     await expect(page).toHaveURL('/')
+
+    // ── 3. Launch second script (Mobile Demo Script) ──
+    await startBtns.nth(1).click()
+    await expect(page).toHaveURL(/\/teleprompter\/\d+/)
+    await expect(page.locator('.tp-content')).toContainText('Welcome to Mobile')
+
+    // Play with mirror and large font
+    await page.getByTitle('Font size').fill('72')
+    await page.getByTitle('Mirror mode (M)').click()
+    await expect(page.locator('.tp-root')).toHaveClass(/mirrored/)
+    await page.getByTitle('Play').click()
+    await page.waitForFunction(() => {
+      const el = document.querySelector('.tp-scroll')
+      return el && el.scrollTop > 50
+    })
+    await page.getByTitle('Pause').click()
+    await page.getByTitle('Mirror mode (M)').click()
+
+    // ── 4. Navigate back and delete one script ──
+    await page.getByTitle('Back').click()
+    await expect(page).toHaveURL('/')
+
+    page.on('dialog', (dialog) => dialog.accept())
+    await page.getByRole('button', { name: '🗑 Delete' }).first().click()
+    await expect(page.locator('.script-card')).toHaveCount(1)
 
     expect(consoleErrors, 'Expected no browser console errors').toEqual([])
   })
