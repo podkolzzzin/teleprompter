@@ -51,7 +51,13 @@ export function useRemoteHost(onCommand: (cmd: RemoteCommand) => void) {
   }
 
   function broadcastState(state: TeleprompterState) {
-    const msg = { type: 'state' as const, ...state }
+    const msg = {
+      type: 'state' as const,
+      playing: state.playing,
+      speed: state.speed,
+      fontSize: state.fontSize,
+      mirror: state.mirror,
+    }
     for (const conn of connections) {
       if (conn.open) conn.send(msg)
     }

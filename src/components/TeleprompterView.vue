@@ -165,14 +165,18 @@ function openShareModal() {
   showShareModal.value = true
 }
 
-// Broadcast state changes to remote controllers
+// Broadcast state changes to remote controllers (throttled to avoid excessive sends)
+let broadcastTimer: ReturnType<typeof setTimeout> | null = null
 watch([playing, speed, fontSize, mirror], () => {
-  broadcastState({
-    playing: playing.value,
-    speed: speed.value,
-    fontSize: fontSize.value,
-    mirror: mirror.value,
-  })
+  if (broadcastTimer) clearTimeout(broadcastTimer)
+  broadcastTimer = setTimeout(() => {
+    broadcastState({
+      playing: playing.value,
+      speed: speed.value,
+      fontSize: fontSize.value,
+      mirror: mirror.value,
+    })
+  }, 50)
 })
 
 const renderedContent = computed(() => {
