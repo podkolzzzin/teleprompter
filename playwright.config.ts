@@ -17,6 +17,14 @@ export default defineConfig({
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
     },
+    {
+      name: 'mobile-portrait',
+      use: { ...devices['Pixel 7'] },
+    },
+    {
+      name: 'mobile-landscape',
+      use: { ...devices['Pixel 7 landscape'] },
+    },
   ],
   webServer: {
     command: 'npm run dev',
