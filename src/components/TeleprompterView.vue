@@ -81,11 +81,33 @@
           ↔ Mirror
         </button>
 
+        <button
+          class="ctrl-btn share-btn"
+          @click="openShare"
+          title="Share this session (S)"
+        >
+          📤 Share
+        </button>
+
         <button class="ctrl-btn hide-btn" @click="controlsHidden = !controlsHidden" title="Toggle controls">
           {{ controlsHidden ? '⚙' : '✕' }}
         </button>
       </div>
     </div>
+
+    <!-- Share modal -->
+    <ShareModal
+      v-if="shareModalOpen"
+      :url="shareUrl"
+      :status="shareStatus"
+      :error-message="shareError"
+      @close="closeShare"
+    >
+      <template #title>
+        <h2 class="modal-title">📤 Share Session</h2>
+        <p class="modal-desc">Scan the QR code or share the link to let someone view this exact teleprompter session on their device.</p>
+      </template>
+    </ShareModal>
 
     <!-- Tap hint when playing -->
     <div v-if="playing && !controlsHidden" class="tap-hint">Tap text to pause</div>
@@ -104,6 +126,8 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { marked } from 'marked'
 import { getScript } from '../storage/db'
+import { useRemoteHost } from '../composables/useRemoteControl'
+import ShareModal from './ShareModal.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -118,6 +142,47 @@ const controlsHidden = ref(false)
 const editingFrame = ref(false)
 const areaWidth = ref(900)
 const areaOffsetX = ref(0)
+
+// Share feature
+const shareModalOpen = ref(false)
+const { peerId: sharePeerId, status: shareHostStatus, error: shareHostError, start: startHost, send: sendSession, stop: stopHost } = useRemoteHost()
+const shareUrl = ref('')
+const shareStatus = computed(() => shareHostStatus.value)
+const shareError = computed(() => shareHostError.value)
+
+async function openShare() {
+  shareModalOpen.value = true
+  try {
+    await startHost()
+    shareUrl.value = `${window.location.origin}/share/${sharePeerId.value}`
+  } catch {
+    // error state is set in the composable
+  }
+}
+
+// Send session data when client connects
+watch(shareHostStatus, (newStatus) => {
+  if (newStatus === 'connected') {
+    sendSession({
+      type: 'session',
+      content: rawContent.value,
+      settings: {
+        speed: speed.value,
+        fontSize: fontSize.value,
+        mirror: mirror.value,
+        areaWidth: areaWidth.value,
+        areaOffsetX: areaOffsetX.value,
+      },
+      scrollOffset: scrollEl.value?.scrollTop ?? 0,
+    })
+  }
+})
+
+function closeShare() {
+  shareModalOpen.value = false
+  stopHost()
+  shareUrl.value = ''
+}
 
 const scrollEl = ref<HTMLElement | null>(null)
 let rafId: number | null = null
@@ -224,6 +289,8 @@ function handleKey(e: KeyboardEvent) {
     controlsHidden.value = !controlsHidden.value
   } else if (e.key === 'f' || e.key === 'F') {
     editingFrame.value = !editingFrame.value
+  } else if (e.key === 's' || e.key === 'S') {
+    if (!shareModalOpen.value) openShare()
   } else if (e.key === 'r' || e.key === 'R') {
     if (scrollEl.value) scrollEl.value.scrollTop = 0
   } else if (e.code === 'Escape') {
@@ -640,5 +707,28 @@ watch(speed, () => {
     padding: 8px 12px;
     font-size: 16px;
   }
+}
+
+.share-btn {
+  background: rgba(74, 222, 128, 0.15);
+  border-color: rgba(74, 222, 128, 0.3);
+  color: var(--accent);
+}
+
+.share-btn:hover {
+  background: rgba(74, 222, 128, 0.25);
+  opacity: 1;
+}
+
+.modal-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.modal-desc {
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.5;
 }
 </style>
