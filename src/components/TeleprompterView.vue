@@ -98,8 +98,7 @@ let rafId: number | null = null
 let lastTime: number | null = null
 
 const renderedContent = computed(() => {
-  const result = marked(rawContent.value || '')
-  return typeof result === 'string' ? result : ''
+  return marked.parse(rawContent.value || '') as string
 })
 
 onMounted(async () => {

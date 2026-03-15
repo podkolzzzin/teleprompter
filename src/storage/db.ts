@@ -34,7 +34,8 @@ export async function getScript(id: number): Promise<Script | undefined> {
 
 export async function saveScript(script: Omit<Script, 'id'>): Promise<number> {
   const db = await getDB()
-  return db.add(STORE_NAME, script) as unknown as Promise<number>
+  const key = await db.add(STORE_NAME, script)
+  return key as number
 }
 
 export async function updateScript(script: Script): Promise<void> {

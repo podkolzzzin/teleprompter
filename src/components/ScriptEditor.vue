@@ -78,8 +78,7 @@ onMounted(async () => {
 })
 
 const renderedPreview = computed(() => {
-  const result = marked(content.value || '')
-  return typeof result === 'string' ? result : ''
+  return marked.parse(content.value || '') as string
 })
 
 async function save() {
