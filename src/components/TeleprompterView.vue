@@ -322,7 +322,7 @@ function onFramePointerDown(action: FrameAction, e: PointerEvent) {
 
 function onFramePointerMove(e: PointerEvent) {
   if (!frameAction) return
-  const dx = e.clientX - frameStartX
+  const dx = (e.clientX - frameStartX) * (mirror.value ? -1 : 1)
 
   if (frameAction === 'move') {
     areaOffsetX.value = clampOffset(frameStartOffsetX + dx, areaWidth.value)
@@ -561,6 +561,14 @@ watch(speed, () => {
   inset: 0;
   z-index: 15;
   pointer-events: none;
+}
+
+.tp-root.mirrored .frame-edit-overlay {
+  transform: scaleX(-1);
+}
+
+.tp-root.mirrored .frame-instructions {
+  transform: scaleX(-1);
 }
 
 .frame-box {
