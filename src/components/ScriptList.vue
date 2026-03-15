@@ -18,7 +18,7 @@
     <p v-if="importError" class="import-error">{{ importError }}</p>
 
     <!-- Transfer modal -->
-    <ShareModal
+    <SessionModal
       v-if="transferModalOpen"
       :url="transferUrl"
       :status="transferStatus"
@@ -29,7 +29,7 @@
         <h2 class="modal-title">📲 Transfer Scripts</h2>
         <p class="modal-desc">Scan the QR code or open the link on your other device to transfer all {{ scripts.length }} script{{ scripts.length !== 1 ? 's' : '' }}.</p>
       </template>
-    </ShareModal>
+    </SessionModal>
 
     <main class="content">
       <div v-if="scripts.length === 0" class="empty-state">
@@ -62,8 +62,8 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { getAllScripts, deleteScript, saveScript, type Script } from '../storage/db'
 import { convertFileToMarkdown, isSupportedFile } from '../utils/fileConverter'
-import { useRemoteHost } from '../composables/useRemoteControl'
-import ShareModal from './ShareModal.vue'
+import { useShareHost } from '../composables/useRemoteControl'
+import SessionModal from './SessionModal.vue'
 
 const router = useRouter()
 const scripts = ref<Script[]>([])
@@ -72,7 +72,7 @@ const importError = ref('')
 
 // Transfer feature
 const transferModalOpen = ref(false)
-const { peerId: transferPeerId, status: transferHostStatus, error: transferHostError, start: startTransferHost, send: sendTransfer, stop: stopTransferHost } = useRemoteHost()
+const { peerId: transferPeerId, status: transferHostStatus, error: transferHostError, start: startTransferHost, send: sendTransfer, stop: stopTransferHost } = useShareHost()
 const transferUrl = ref('')
 const transferStatus = computed(() => transferHostStatus.value)
 const transferError = computed(() => transferHostError.value)

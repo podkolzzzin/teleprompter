@@ -2,11 +2,11 @@
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { saveScript } from '../storage/db'
-import { useRemoteClient, type TransferPayload } from '../composables/useRemoteControl'
+import { useShareClient, type TransferPayload } from '../composables/useRemoteControl'
 
 const route = useRoute()
 const router = useRouter()
-const { status, error, connect, onData } = useRemoteClient()
+const { status, error, connect, onData } = useShareClient()
 
 const imported = ref(0)
 const total = ref(0)

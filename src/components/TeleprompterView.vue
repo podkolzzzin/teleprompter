@@ -81,12 +81,23 @@
           ↔ Mirror
         </button>
 
+        <!-- Remote control share button -->
         <button
           class="ctrl-btn share-btn"
-          @click="openShare"
+          :class="{ active: remoteConnected }"
+          @click="openShareModal"
+          title="Share remote control"
+        >
+          📲 Share
+        </button>
+
+        <!-- Session share button -->
+        <button
+          class="ctrl-btn session-share-btn"
+          @click="openSessionShare"
           title="Share this session (S)"
         >
-          📤 Share
+          📤 Session
         </button>
 
         <button class="ctrl-btn hide-btn" @click="controlsHidden = !controlsHidden" title="Toggle controls">
@@ -95,20 +106,6 @@
       </div>
     </div>
 
-    <!-- Share modal -->
-    <ShareModal
-      v-if="shareModalOpen"
-      :url="shareUrl"
-      :status="shareStatus"
-      :error-message="shareError"
-      @close="closeShare"
-    >
-      <template #title>
-        <h2 class="modal-title">📤 Share Session</h2>
-        <p class="modal-desc">Scan the QR code or share the link to let someone view this exact teleprompter session on their device.</p>
-      </template>
-    </ShareModal>
-
     <!-- Tap hint when playing -->
     <div v-if="playing && !controlsHidden" class="tap-hint">Tap text to pause</div>
 
@@ -116,6 +113,28 @@
     <button v-if="controlsHidden" class="show-controls-btn" @click.stop="controlsHidden = false">
       ⚙
     </button>
+
+    <!-- Remote control share modal -->
+    <ShareModal
+      v-if="showShareModal"
+      :shareUrl="remoteUrl"
+      :connected="remoteConnected"
+      @close="showShareModal = false"
+    />
+
+    <!-- Session share modal -->
+    <SessionModal
+      v-if="sessionShareOpen"
+      :url="sessionShareUrl"
+      :status="sessionShareStatus"
+      :error-message="sessionShareError"
+      @close="closeSessionShare"
+    >
+      <template #title>
+        <h2 class="modal-title">📤 Share Session</h2>
+        <p class="modal-desc">Scan the QR code or share the link to let someone view this exact teleprompter session on their device.</p>
+      </template>
+    </SessionModal>
 
     <div v-if="loading" class="loading">Loading…</div>
   </div>
@@ -126,8 +145,9 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { marked } from 'marked'
 import { getScript } from '../storage/db'
-import { useRemoteHost } from '../composables/useRemoteControl'
 import ShareModal from './ShareModal.vue'
+import SessionModal from './SessionModal.vue'
+import { useRemoteHost, useShareHost, type RemoteCommand } from '../composables/useRemoteControl'
 
 const router = useRouter()
 const route = useRoute()
@@ -142,26 +162,68 @@ const controlsHidden = ref(false)
 const editingFrame = ref(false)
 const areaWidth = ref(900)
 const areaOffsetX = ref(0)
+const showShareModal = ref(false)
 
-// Share feature
-const shareModalOpen = ref(false)
-const { peerId: sharePeerId, status: shareHostStatus, error: shareHostError, start: startHost, send: sendSession, stop: stopHost } = useRemoteHost()
-const shareUrl = ref('')
-const shareStatus = computed(() => shareHostStatus.value)
-const shareError = computed(() => shareHostError.value)
+const scrollEl = ref<HTMLElement | null>(null)
+let rafId: number | null = null
+let lastTime: number | null = null
 
-async function openShare() {
-  shareModalOpen.value = true
+// ── Remote control (smartphone controls the teleprompter) ─────────────────────
+function handleRemoteCommand(cmd: RemoteCommand) {
+  if (cmd.type === 'togglePlay') togglePlay()
+  else if (cmd.type === 'speedUp') speed.value = Math.min(20, speed.value + 1)
+  else if (cmd.type === 'speedDown') speed.value = Math.max(1, speed.value - 1)
+  else if (cmd.type === 'fontUp') fontSize.value = Math.min(96, fontSize.value + 4)
+  else if (cmd.type === 'fontDown') fontSize.value = Math.max(24, fontSize.value - 4)
+  else if (cmd.type === 'toggleMirror') mirror.value = !mirror.value
+  else if (cmd.type === 'reset' && scrollEl.value) scrollEl.value.scrollTop = 0
+}
+
+const { peerId: remotePeerId, connected: remoteConnected, init: initRemoteHost, broadcastState } =
+  useRemoteHost(handleRemoteCommand)
+
+const remoteUrl = computed(() => {
+  if (!remotePeerId.value) return ''
+  return `${window.location.origin}/remote/${remotePeerId.value}`
+})
+
+function openShareModal() {
+  if (!remotePeerId.value) initRemoteHost()
+  showShareModal.value = true
+}
+
+// Broadcast state changes to remote controllers (throttled to avoid excessive sends)
+let broadcastTimer: ReturnType<typeof setTimeout> | null = null
+watch([playing, speed, fontSize, mirror], () => {
+  if (broadcastTimer) clearTimeout(broadcastTimer)
+  broadcastTimer = setTimeout(() => {
+    broadcastState({
+      playing: playing.value,
+      speed: speed.value,
+      fontSize: fontSize.value,
+      mirror: mirror.value,
+    })
+  }, 50)
+})
+
+// ── Session share (share current session state to another device) ─────────────
+const sessionShareOpen = ref(false)
+const { peerId: sessionPeerId, status: sessionShareHostStatus, error: sessionShareHostError, start: startShareHost, send: sendSession, stop: stopShareHost } = useShareHost()
+const sessionShareUrl = ref('')
+const sessionShareStatus = computed(() => sessionShareHostStatus.value)
+const sessionShareError = computed(() => sessionShareHostError.value)
+
+async function openSessionShare() {
+  sessionShareOpen.value = true
   try {
-    await startHost()
-    shareUrl.value = `${window.location.origin}/share/${sharePeerId.value}`
+    await startShareHost()
+    sessionShareUrl.value = `${window.location.origin}/share/${sessionPeerId.value}`
   } catch {
     // error state is set in the composable
   }
 }
 
-// Send session data when client connects
-watch(shareHostStatus, (newStatus) => {
+watch(sessionShareHostStatus, (newStatus) => {
   if (newStatus === 'connected') {
     sendSession({
       type: 'session',
@@ -178,16 +240,13 @@ watch(shareHostStatus, (newStatus) => {
   }
 })
 
-function closeShare() {
-  shareModalOpen.value = false
-  stopHost()
-  shareUrl.value = ''
+function closeSessionShare() {
+  sessionShareOpen.value = false
+  stopShareHost()
+  sessionShareUrl.value = ''
 }
 
-const scrollEl = ref<HTMLElement | null>(null)
-let rafId: number | null = null
-let lastTime: number | null = null
-
+// ── Rendered content ──────────────────────────────────────────────────────────
 const renderedContent = computed(() => {
   return marked.parse(rawContent.value || '') as string
 })
@@ -290,7 +349,7 @@ function handleKey(e: KeyboardEvent) {
   } else if (e.key === 'f' || e.key === 'F') {
     editingFrame.value = !editingFrame.value
   } else if (e.key === 's' || e.key === 'S') {
-    if (!shareModalOpen.value) openShare()
+    if (!sessionShareOpen.value) openSessionShare()
   } else if (e.key === 'r' || e.key === 'R') {
     if (scrollEl.value) scrollEl.value.scrollTop = 0
   } else if (e.code === 'Escape') {
@@ -456,6 +515,23 @@ watch(speed, () => {
   background: rgba(74, 222, 128, 0.25);
   border-color: var(--accent);
   color: var(--accent);
+}
+
+.share-btn.active {
+  background: rgba(74, 222, 128, 0.25);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.session-share-btn {
+  background: rgba(74, 222, 128, 0.15);
+  border-color: rgba(74, 222, 128, 0.3);
+  color: var(--accent);
+}
+
+.session-share-btn:hover {
+  background: rgba(74, 222, 128, 0.25);
+  opacity: 1;
 }
 
 .ctrl-group {
@@ -693,6 +769,18 @@ watch(speed, () => {
   margin: 1em 0;
 }
 
+.modal-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.modal-desc {
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
 @media (max-width: 640px) {
   .tp-content {
     padding: 24px 24px 0;
@@ -707,28 +795,5 @@ watch(speed, () => {
     padding: 8px 12px;
     font-size: 16px;
   }
-}
-
-.share-btn {
-  background: rgba(74, 222, 128, 0.15);
-  border-color: rgba(74, 222, 128, 0.3);
-  color: var(--accent);
-}
-
-.share-btn:hover {
-  background: rgba(74, 222, 128, 0.25);
-  opacity: 1;
-}
-
-.modal-title {
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--text);
-}
-
-.modal-desc {
-  font-size: 13px;
-  color: var(--text-muted);
-  line-height: 1.5;
 }
 </style>

@@ -8,6 +8,21 @@ vi.mock('../storage/db', () => ({
   getScript: vi.fn(),
 }))
 
+// Mock peerjs to avoid network calls in tests
+vi.mock('peerjs', () => ({
+  default: vi.fn(() => ({
+    on: vi.fn(),
+    destroy: vi.fn(),
+  })),
+}))
+
+// Mock qrcode
+vi.mock('qrcode', () => ({
+  default: {
+    toCanvas: vi.fn(),
+  },
+}))
+
 import { getScript } from '../storage/db'
 
 function createTestRouter(id = 1) {
@@ -340,5 +355,30 @@ describe('TeleprompterView', () => {
     window.dispatchEvent(new KeyboardEvent('keydown', { code: 'ArrowLeft', key: 'ArrowLeft' }))
     await wrapper.vm.$nextTick()
     expect(scrollEl.attributes('style')).toContain('font-size: 48px')
+  })
+
+  it('renders share button in controls', async () => {
+    vi.mocked(getScript).mockResolvedValue({
+      id: 1,
+      title: 'Test',
+      content: 'Content',
+      createdAt: 1000,
+      updatedAt: 1000,
+    })
+
+    const router = createTestRouter()
+    await router.isReady()
+
+    const wrapper = mount(TeleprompterView, {
+      global: { plugins: [router] },
+    })
+
+    await vi.waitFor(() => {
+      expect(wrapper.find('.loading').exists()).toBe(false)
+    })
+
+    const shareBtn = wrapper.find('.share-btn')
+    expect(shareBtn.exists()).toBe(true)
+    expect(shareBtn.text()).toContain('Share')
   })
 })

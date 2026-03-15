@@ -1,192 +1,177 @@
-<script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
-import QRCode from 'qrcode'
-
-const props = defineProps<{
-  url: string
-  status: 'idle' | 'waiting' | 'connected' | 'error'
-  errorMessage?: string
-}>()
-
-const emit = defineEmits<{
-  close: []
-}>()
-
-const qrDataUrl = ref('')
-const copied = ref(false)
-
-async function generateQr(url: string) {
-  if (!url) return
-  qrDataUrl.value = await QRCode.toDataURL(url, {
-    width: 200,
-    margin: 1,
-    color: { dark: '#000000', light: '#ffffff' },
-  })
-}
-
-onMounted(() => generateQr(props.url))
-watch(() => props.url, generateQr)
-
-async function copyLink() {
-  if (!props.url) return
-  await navigator.clipboard.writeText(props.url)
-  copied.value = true
-  setTimeout(() => (copied.value = false), 2000)
-}
-</script>
-
 <template>
-  <div class="modal-backdrop" @click.self="emit('close')">
-    <div class="modal">
-      <button class="modal-close" @click="emit('close')" title="Close">✕</button>
+  <div class="share-backdrop" @click.self="$emit('close')">
+    <div class="share-modal">
+      <h2 class="share-title">Remote Control</h2>
+      <p class="share-desc">
+        Scan the QR code or open the link on another device to control this teleprompter.
+      </p>
 
-      <slot name="title" />
-
-      <div class="qr-wrapper">
-        <img v-if="qrDataUrl" :src="qrDataUrl" alt="QR Code" class="qr-img" />
-        <div v-else class="qr-skeleton">Generating QR…</div>
+      <div class="qr-container">
+        <canvas ref="qrCanvas"></canvas>
       </div>
 
-      <p class="url-label">Or copy the link:</p>
-      <div class="url-row">
-        <input class="url-input" :value="url" readonly aria-label="Share link" />
-        <button class="btn-copy" @click="copyLink">{{ copied ? '✓ Copied' : 'Copy' }}</button>
+      <div class="share-link-row">
+        <input
+          class="share-link-input"
+          :value="shareUrl"
+          readonly
+          @focus="($event.target as HTMLInputElement).select()"
+        />
+        <button class="share-copy-btn" @click="copyLink">
+          {{ copied ? '✓' : '📋' }}
+        </button>
       </div>
 
-      <div
-        class="status-banner"
-        :class="{
-          'status-waiting': status === 'waiting',
-          'status-connected': status === 'connected',
-          'status-error': status === 'error',
-        }"
-      >
-        <template v-if="status === 'waiting'">⏳ Waiting for the other device to connect…</template>
-        <template v-else-if="status === 'connected'">✅ Connected! Sending data…</template>
-        <template v-else-if="status === 'error'">❌ Error: {{ errorMessage }}</template>
-        <template v-else>Initialising…</template>
-      </div>
+      <div v-if="connected" class="share-status connected">● Remote connected</div>
+      <div v-else class="share-status waiting">○ Waiting for connection…</div>
 
-      <slot />
+      <button class="share-close-btn" @click="$emit('close')">Close</button>
     </div>
   </div>
 </template>
 
+<script setup lang="ts">
+import { ref, watch, onMounted } from 'vue'
+import QRCode from 'qrcode'
+
+const props = defineProps<{
+  shareUrl: string
+  connected: boolean
+}>()
+
+defineEmits<{
+  close: []
+}>()
+
+const qrCanvas = ref<HTMLCanvasElement | null>(null)
+const copied = ref(false)
+
+function renderQR() {
+  if (qrCanvas.value && props.shareUrl) {
+    QRCode.toCanvas(qrCanvas.value, props.shareUrl, {
+      width: 200,
+      margin: 2,
+      color: { dark: '#000000', light: '#ffffff' },
+    })
+  }
+}
+
+onMounted(renderQR)
+watch(() => props.shareUrl, renderQR)
+
+function copyLink() {
+  navigator.clipboard.writeText(props.shareUrl).then(() => {
+    copied.value = true
+    setTimeout(() => (copied.value = false), 2000)
+  })
+}
+</script>
+
 <style scoped>
-.modal-backdrop {
+.share-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.7);
+  background: rgba(0, 0, 0, 0.8);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 100;
-  padding: 16px;
 }
 
-.modal {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 28px 24px 24px;
-  width: 100%;
-  max-width: 380px;
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
+.share-modal {
+  background: var(--surface, #1e1e1e);
+  border: 1px solid var(--border, #333);
+  border-radius: 12px;
+  padding: 24px;
+  max-width: 360px;
+  width: 90%;
+  text-align: center;
 }
 
-.modal-close {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  background: transparent;
-  border: none;
-  color: var(--text-muted);
-  font-size: 18px;
-  padding: 4px 8px;
-  line-height: 1;
+.share-title {
+  font-size: 20px;
+  color: var(--text, #f0f0f0);
+  margin: 0 0 8px;
 }
 
-.modal-close:hover {
-  color: var(--text);
-}
-
-.qr-wrapper {
-  display: flex;
-  justify-content: center;
-}
-
-.qr-img {
-  border-radius: 8px;
-  width: 200px;
-  height: 200px;
-}
-
-.qr-skeleton {
-  width: 200px;
-  height: 200px;
-  background: var(--border);
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-muted);
+.share-desc {
   font-size: 14px;
+  color: var(--text-muted, #999);
+  margin: 0 0 16px;
+  line-height: 1.4;
 }
 
-.url-label {
-  font-size: 13px;
-  color: var(--text-muted);
+.qr-container {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 16px;
 }
 
-.url-row {
+.qr-container canvas {
+  border-radius: 8px;
+}
+
+.share-link-row {
   display: flex;
   gap: 8px;
+  margin-bottom: 12px;
 }
 
-.url-input {
+.share-link-input {
   flex: 1;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  color: var(--text);
-  font-size: 12px;
-  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border, #333);
+  border-radius: 6px;
+  color: var(--text, #f0f0f0);
+  padding: 8px 12px;
+  font-size: 13px;
+  outline: none;
   min-width: 0;
 }
 
-.btn-copy {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  color: var(--text);
-  font-size: 13px;
-  white-space: nowrap;
+.share-link-input:focus {
+  border-color: var(--accent, #4ade80);
+}
+
+.share-copy-btn {
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid var(--border, #333);
+  border-radius: 6px;
+  color: var(--text, #f0f0f0);
+  padding: 8px 12px;
+  font-size: 16px;
+  cursor: pointer;
   flex-shrink: 0;
 }
 
-.status-banner {
-  padding: 10px 14px;
-  border-radius: var(--radius);
+.share-copy-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.share-status {
   font-size: 13px;
-  text-align: center;
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--text-muted);
+  margin-bottom: 16px;
 }
 
-.status-waiting {
-  background: rgba(74, 222, 128, 0.08);
-  color: var(--accent);
+.share-status.connected {
+  color: var(--accent, #4ade80);
 }
 
-.status-connected {
-  background: rgba(74, 222, 128, 0.15);
-  color: var(--accent);
+.share-status.waiting {
+  color: var(--text-muted, #999);
 }
 
-.status-error {
-  background: rgba(239, 68, 68, 0.12);
-  color: var(--danger);
+.share-close-btn {
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  color: var(--text, #f0f0f0);
+  padding: 10px 24px;
+  font-size: 15px;
+  cursor: pointer;
+}
+
+.share-close-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
 }
 </style>

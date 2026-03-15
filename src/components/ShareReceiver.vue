@@ -2,11 +2,11 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { marked } from 'marked'
-import { useRemoteClient, type SessionPayload } from '../composables/useRemoteControl'
+import { useShareClient, type SessionPayload } from '../composables/useRemoteControl'
 
 const route = useRoute()
 const router = useRouter()
-const { status, error, connect, onData } = useRemoteClient()
+const { status, error, connect, onData } = useShareClient()
 
 const rawContent = ref('')
 const playing = ref(false)
