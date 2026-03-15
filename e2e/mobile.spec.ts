@@ -34,8 +34,11 @@ test.describe('Mobile teleprompter workflow', () => {
     await page.getByTitle('Play').click()
     await expect(page.getByTitle('Pause')).toBeVisible()
 
-    // Let it scroll for video capture
-    await page.waitForTimeout(2000)
+    // Wait for scroll to progress (observable state change)
+    await page.waitForFunction(() => {
+      const el = document.querySelector('.tp-scroll')
+      return el && el.scrollTop > 0
+    })
 
     // Pause
     await page.getByTitle('Pause').click()
@@ -90,9 +93,6 @@ test.describe('Mobile teleprompter workflow', () => {
     // The root element should have the mirrored class
     await expect(page.locator('.tp-root.mirrored')).toBeVisible()
 
-    // Let video capture the mirrored state
-    await page.waitForTimeout(1000)
-
     // Toggle back
     await mirrorBtn.click()
     await expect(page.locator('.tp-root.mirrored')).not.toBeVisible()
@@ -127,10 +127,13 @@ test.describe('Mobile teleprompter workflow', () => {
     await page.getByRole('button', { name: '▶ Start' }).click()
     await expect(page).toHaveURL(/\/teleprompter\/\d+/)
 
-    // Play and let it scroll for a visible demo
+    // Play and wait for scrolling to progress
     await page.getByTitle('Play').click()
     await expect(page.getByTitle('Pause')).toBeVisible()
-    await page.waitForTimeout(3000)
+    await page.waitForFunction(() => {
+      const el = document.querySelector('.tp-scroll')
+      return el && el.scrollTop > 0
+    })
 
     // Pause and go back
     await page.getByTitle('Pause').click()
