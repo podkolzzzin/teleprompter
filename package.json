@@ -7,6 +7,7 @@
     "build": "vue-tsc && vite build",
     "preview": "vite preview",
     "typecheck": "vue-tsc --noEmit",
+    "test:unit": "vitest run",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "mcp": "playwright-mcp --port 8931"
@@ -21,9 +22,12 @@
     "@playwright/mcp": "^0.0.68",
     "@playwright/test": "^1.58.2",
     "@vitejs/plugin-vue": "^5.0.0",
+    "@vue/test-utils": "^2.4.6",
+    "jsdom": "^29.0.0",
     "typescript": "^5.4.0",
     "vite": "^5.2.0",
     "vite-plugin-pwa": "^0.20.0",
+    "vitest": "^4.1.0",
     "vue-tsc": "^2.0.0"
   }
 }
