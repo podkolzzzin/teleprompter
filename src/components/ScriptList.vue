@@ -2,8 +2,19 @@
   <div class="page">
     <header class="header">
       <h1 class="logo">📺 Teleprompter</h1>
-      <button class="btn-accent" @click="router.push('/edit')">+ New Script</button>
+      <div class="header-actions">
+        <button class="btn-import" @click="fileInput?.click()">📄 Import</button>
+        <button class="btn-accent" @click="router.push('/edit')">+ New Script</button>
+      </div>
+      <input
+        ref="fileInput"
+        type="file"
+        accept=".docx,.pdf"
+        class="sr-only"
+        @change="handleFileImport"
+      />
     </header>
+    <p v-if="importError" class="import-error">{{ importError }}</p>
 
     <main class="content">
       <div v-if="scripts.length === 0" class="empty-state">
@@ -34,16 +45,43 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { getAllScripts, deleteScript, type Script } from '../storage/db'
+import { getAllScripts, deleteScript, saveScript, type Script } from '../storage/db'
+import { convertFileToMarkdown, isSupportedFile } from '../utils/fileConverter'
 
 const router = useRouter()
 const scripts = ref<Script[]>([])
+const fileInput = ref<HTMLInputElement | null>(null)
+const importError = ref('')
 
 async function load() {
   scripts.value = await getAllScripts()
 }
 
 onMounted(load)
+
+async function handleFileImport(event: Event) {
+  importError.value = ''
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+
+  if (!isSupportedFile(file)) {
+    importError.value = 'Unsupported file type. Please use .docx or .pdf files.'
+    input.value = ''
+    return
+  }
+
+  try {
+    const { title, content } = await convertFileToMarkdown(file)
+    const now = Date.now()
+    const id = await saveScript({ title, content, createdAt: now, updatedAt: now })
+    input.value = ''
+    router.push(`/edit/${id}`)
+  } catch {
+    importError.value = 'Failed to import file. Please try a different file.'
+    input.value = ''
+  }
+}
 
 const sortedScripts = computed(() =>
   [...scripts.value].sort((a, b) => b.createdAt - a.createdAt)
@@ -88,6 +126,38 @@ async function confirmDelete(id: number) {
   position: sticky;
   top: 0;
   z-index: 10;
+}
+
+.header-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.import-error {
+  color: var(--danger);
+  font-size: 14px;
+  text-align: center;
+  padding: 8px 24px;
+  background: var(--surface);
+}
+
+.btn-import {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-weight: 600;
 }
 
 .logo {
