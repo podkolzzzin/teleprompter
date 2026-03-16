@@ -392,7 +392,7 @@ function onFramePointerDown(action: FrameAction, e: PointerEvent) {
 
 function onFramePointerMove(e: PointerEvent) {
   if (!frameAction) return
-  const dx = e.clientX - frameStartX
+  const dx = (e.clientX - frameStartX) * (mirror.value ? -1 : 1)
 
   if (frameAction === 'move') {
     areaOffsetX.value = clampOffset(frameStartOffsetX + dx, areaWidth.value)

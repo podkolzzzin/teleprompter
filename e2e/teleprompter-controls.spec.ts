@@ -254,10 +254,13 @@ test.describe('Teleprompter controls', () => {
     await page.mouse.up()
 
     // After dragging in mirror mode, the content marginLeft should change
+    // After dragging right in mirror mode, the internal offset should decrease
+    // (because dx is negated), so the content marginLeft should change
     const newMargin = await getContentMarginLeft()
     expect(newMargin).not.toEqual(initialMargin)
 
     // Verify the frame box and content are visually aligned:
+    // The frame-box left (after CSS mirror) should match the content visual position
     const frameBox = page.locator('.frame-box')
     const frameRect = await frameBox.boundingBox()
     const contentRect = await page.locator('.tp-content').boundingBox()
