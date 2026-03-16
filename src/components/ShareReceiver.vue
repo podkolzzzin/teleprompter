@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { marked } from 'marked'
 import { useShareClient, type SessionPayload } from '../composables/useRemoteControl'
@@ -55,13 +55,14 @@ onUnmounted(() => {
   window.removeEventListener('keydown', handleKey)
 })
 
-function applySession(session: SessionPayload) {
+async function applySession(session: SessionPayload) {
   rawContent.value = session.content
   speed.value = session.settings.speed
   fontSize.value = session.settings.fontSize
   mirror.value = session.settings.mirror
   areaWidth.value = session.settings.areaWidth
   areaOffsetX.value = session.settings.areaOffsetX
+  await nextTick()
   if (scrollEl.value) {
     scrollEl.value.scrollTop = session.scrollOffset
   }
