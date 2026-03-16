@@ -27,6 +27,11 @@
 
     <!-- Controls overlay -->
     <div class="controls" @click.stop>
+      <!-- Timeline progress bar -->
+      <div class="timeline" @click.stop="onTimelineClick" @pointerdown.stop title="Timeline — click to seek">
+        <div class="timeline-fill" :style="{ width: scrollProgress + '%' }"></div>
+      </div>
+
       <div class="controls-inner">
         <button class="ctrl-btn back-btn" @click="router.push('/')" title="Back">
           ←
