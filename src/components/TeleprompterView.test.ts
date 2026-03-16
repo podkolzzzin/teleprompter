@@ -379,6 +379,6 @@ describe('TeleprompterView', () => {
 
     const shareBtn = wrapper.find('.share-btn')
     expect(shareBtn.exists()).toBe(true)
-    expect(shareBtn.text()).toContain('Remote control')
+    expect(shareBtn.attributes('title')).toBe('Remote control')
   })
 })

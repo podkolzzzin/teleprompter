@@ -89,21 +89,21 @@
 
         <!-- Remote control share button -->
         <button
-          class="ctrl-btn share-btn"
+          class="ctrl-btn icon-btn share-btn"
           :class="{ active: remoteConnected }"
           @click="openShareModal"
           title="Remote control"
         >
-          📲 Remote control
+          📲
         </button>
 
         <!-- Session share button -->
         <button
-          class="ctrl-btn session-share-btn"
+          class="ctrl-btn icon-btn"
           @click="openSessionShare"
           title="Share this session (S)"
         >
-          📤 Session
+          📤
         </button>
 
         <button class="ctrl-btn icon-btn hide-btn" @click="controlsHidden = !controlsHidden" title="Toggle controls">
@@ -199,6 +199,11 @@ function openShareModal() {
   if (!remotePeerId.value) initRemoteHost()
   showShareModal.value = true
 }
+
+// Auto-close share modal once remote client connects
+watch(remoteConnected, (connected) => {
+  if (connected) showShareModal.value = false
+})
 
 // Broadcast state changes to remote controllers (throttled to avoid excessive sends)
 let broadcastTimer: ReturnType<typeof setTimeout> | null = null
@@ -536,23 +541,6 @@ watch(speed, () => {
   border-color: transparent;
   font-size: 20px;
   min-width: 52px;
-}
-
-.share-btn.active {
-  background: rgba(74, 222, 128, 0.25);
-  border-color: var(--accent);
-  color: var(--accent);
-}
-
-.session-share-btn {
-  background: rgba(74, 222, 128, 0.15);
-  border-color: rgba(74, 222, 128, 0.3);
-  color: var(--accent);
-}
-
-.session-share-btn:hover {
-  background: rgba(74, 222, 128, 0.25);
-  opacity: 1;
 }
 
 .ctrl-group {
