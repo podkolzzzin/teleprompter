@@ -18,6 +18,8 @@ export type RemoteCommand =
   | { type: 'fontDown' }
   | { type: 'toggleMirror' }
   | { type: 'reset' }
+  | { type: 'scrollUp' }
+  | { type: 'scrollDown' }
 
 // ─── Share / Transfer payload types ──────────────────────────────────────────
 

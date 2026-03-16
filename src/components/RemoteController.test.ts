@@ -165,17 +165,23 @@ describe('RemoteController', () => {
     })
 
     const buttons = wrapper.findAll('.small-btn')
-    // Speed down, Speed up, Font down, Font up
+    // Scroll up, Scroll down, Speed down, Speed up, Font down, Font up
     await buttons[0].trigger('click')
-    expect(mockSend).toHaveBeenCalledWith({ type: 'speedDown' })
+    expect(mockSend).toHaveBeenCalledWith({ type: 'scrollUp' })
 
     await buttons[1].trigger('click')
-    expect(mockSend).toHaveBeenCalledWith({ type: 'speedUp' })
+    expect(mockSend).toHaveBeenCalledWith({ type: 'scrollDown' })
 
     await buttons[2].trigger('click')
-    expect(mockSend).toHaveBeenCalledWith({ type: 'fontDown' })
+    expect(mockSend).toHaveBeenCalledWith({ type: 'speedDown' })
 
     await buttons[3].trigger('click')
+    expect(mockSend).toHaveBeenCalledWith({ type: 'speedUp' })
+
+    await buttons[4].trigger('click')
+    expect(mockSend).toHaveBeenCalledWith({ type: 'fontDown' })
+
+    await buttons[5].trigger('click')
     expect(mockSend).toHaveBeenCalledWith({ type: 'fontUp' })
   })
 
