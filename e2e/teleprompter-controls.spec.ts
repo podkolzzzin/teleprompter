@@ -213,18 +213,22 @@ test.describe('Teleprompter controls', () => {
       await page.getByTitle('Edit prompter frame (F)').click()
       await expect(page.locator('.frame-edit-overlay')).toBeVisible()
 
-      // Shrink frame to 60% of viewport using dispatchEvent (handles may be off-screen)
+      // Shrink frame to 60% of viewport using dispatchEvent (handles are off-screen).
+      // Events must be dispatched in separate evaluate calls so Vue's reactivity
+      // can process state changes between pointerdown and pointermove.
       const targetWidth = Math.floor(viewportWidth * 0.6)
-      await page.evaluate((tw) => {
+      const startX = Math.floor(900 / 2 + viewportWidth / 2)
+      const endX = startX - (900 - targetWidth)
+      await page.evaluate((sx) => {
         const handle = document.querySelector('.frame-handle-right') as HTMLElement
-        if (!handle) return
-        const startX = 900 / 2 + window.innerWidth / 2 // right edge of centered 900px frame
-        const endX = startX - (900 - tw)
-        const centerY = window.innerHeight / 2
-        handle.dispatchEvent(new PointerEvent('pointerdown', { clientX: startX, clientY: centerY, bubbles: true, cancelable: true }))
-        document.dispatchEvent(new PointerEvent('pointermove', { clientX: endX, clientY: centerY, bubbles: true, cancelable: true }))
-        document.dispatchEvent(new PointerEvent('pointerup', { clientX: endX, clientY: centerY, bubbles: true, cancelable: true }))
-      }, targetWidth)
+        handle?.dispatchEvent(new PointerEvent('pointerdown', { clientX: sx, clientY: 400, bubbles: true, cancelable: true }))
+      }, startX)
+      await page.evaluate((ex) => {
+        document.dispatchEvent(new PointerEvent('pointermove', { clientX: ex, clientY: 400, bubbles: true, cancelable: true }))
+      }, endX)
+      await page.evaluate((ex) => {
+        document.dispatchEvent(new PointerEvent('pointerup', { clientX: ex, clientY: 400, bubbles: true, cancelable: true }))
+      }, endX)
 
       // Close frame editor, then enable mirror and reopen
       await page.getByTitle('Edit prompter frame (F)').click()
@@ -243,18 +247,20 @@ test.describe('Teleprompter controls', () => {
 
     const initialMargin = await getContentMarginLeft()
 
-    // Drag the frame move zone to the right
+    // Drag the frame move zone to the left.
+    // In mirror mode dx is negated, so dragging left increases the internal offset.
+    // On mobile the resize step leaves the offset at the negative clamp limit,
+    // so only a drag that increases offset will produce a visible change.
     const moveZone = page.locator('.frame-move-zone')
     const box = await moveZone.boundingBox()
     expect(box).not.toBeNull()
 
     await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2)
     await page.mouse.down()
-    await page.mouse.move(box!.x + box!.width / 2 + 100, box!.y + box!.height / 2, { steps: 5 })
+    await page.mouse.move(box!.x + box!.width / 2 - 100, box!.y + box!.height / 2, { steps: 5 })
     await page.mouse.up()
 
-    // After dragging in mirror mode, the content marginLeft should change
-    // After dragging right in mirror mode, the internal offset should decrease
+    // After dragging left in mirror mode, the internal offset increases
     // (because dx is negated), so the content marginLeft should change
     const newMargin = await getContentMarginLeft()
     expect(newMargin).not.toEqual(initialMargin)
