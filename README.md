@@ -15,6 +15,8 @@ A Progressive Web App (PWA) teleprompter for reading scripts in the browser. Sup
 - 🪞 **Mirror Mode** — Horizontal flip for use with physical teleprompter glass
 - 🖼️ **Frame Editor** — Drag and resize the content area to fit any physical prompter setup
 - 📲 **Remote Control** — Share a link or QR code so a second device can control playback via WebRTC (PeerJS)
+- 📤 **Session Share** — Share the current teleprompter session (content, settings, scroll position) to another device
+- 📲 **Script Transfer** — Transfer all scripts to another device via WebRTC
 - 📄 **File Import** — Import `.docx` and `.pdf` files, automatically converted to Markdown
 - 🎯 **Focus Gradient** — Top/bottom dimming with a centre highlight line for easier reading
 - ⌨️ **Keyboard Shortcuts** — Full keyboard control (see table below)
@@ -31,6 +33,7 @@ A Progressive Web App (PWA) teleprompter for reading scripts in the browser. Sup
 | **M** | Toggle mirror mode |
 | **H** | Hide / Show controls |
 | **F** | Toggle frame editor |
+| **S** | Open session share |
 | **R** | Reset scroll to top |
 | **Esc** | Exit frame editor or go back |
 
@@ -60,15 +63,25 @@ src/
 │   ├── ScriptEditor.vue           # Markdown editor with live preview
 │   ├── TeleprompterView.vue       # Full-screen scrolling display with controls
 │   ├── RemoteController.vue       # Remote control UI for a second device
-│   └── ShareModal.vue             # QR code + link sharing modal
+│   ├── ShareReceiver.vue          # Receive a shared teleprompter session
+│   ├── TransferReceiver.vue       # Receive transferred scripts from another device
+│   ├── ShareModal.vue             # QR code + link sharing modal (remote control)
+│   └── SessionModal.vue           # QR code + link modal (session share / transfer)
 ├── composables/
-│   └── useRemoteControl.ts        # PeerJS host/client composables
-├── router/index.ts                # Route definitions (/, /edit/:id?, /teleprompter/:id, /remote/:peerId)
+│   └── useRemoteControl.ts        # PeerJS host/client composables (remote, share, transfer)
+├── router/index.ts                # Route definitions (/, /edit/:id?, /teleprompter/:id, /remote/:peerId, /share/:peerId, /transfer/:peerId)
 ├── storage/db.ts                  # IndexedDB CRUD helpers
 └── utils/
     └── fileConverter.ts           # DOCX/PDF → Markdown conversion
-e2e/                               # Playwright end-to-end tests
-playwright.config.ts               # Playwright configuration
+e2e/
+├── app.spec.ts                    # Basic app, editor, and teleprompter tests
+├── script-management.spec.ts      # CRUD: edit, preserve, delete, multi-script
+├── workflow.spec.ts               # Full create → edit → teleprompter workflows
+├── teleprompter-controls.spec.ts  # Sliders, mirror, frame editor, keyboard shortcuts
+├── mobile.spec.ts                 # Mobile-specific viewport tests
+├── big-e2e.spec.ts                # Comprehensive E2E: create (manual/pdf/docx), play, share, persist, transfer
+└── fixtures/                      # Test fixture files for file import testing
+playwright.config.ts               # Playwright configuration (3 projects, video recording)
 ```
 
 ## Getting Started
@@ -106,7 +119,7 @@ npm run preview
 
 ## Testing
 
-End-to-end tests use [Playwright](https://playwright.dev/). The dev server is started automatically before the tests run.
+Unit tests use [Vitest](https://vitest.dev/) and end-to-end tests use [Playwright](https://playwright.dev/). The dev server is started automatically before E2E tests run. All E2E tests record video (configured in `playwright.config.ts`).
 
 ### Install browsers (first time)
 
@@ -114,7 +127,13 @@ End-to-end tests use [Playwright](https://playwright.dev/). The dev server is st
 npx playwright install --with-deps chromium
 ```
 
-### Run tests
+### Run unit tests
+
+```bash
+npm run test:unit
+```
+
+### Run E2E tests
 
 ```bash
 npm run test:e2e
@@ -125,6 +144,19 @@ npm run test:e2e
 ```bash
 npm run test:e2e:ui
 ```
+
+### E2E test suite overview
+
+| Test file | Coverage |
+|-----------|----------|
+| `app.spec.ts` | Empty state, navigation, editor validation, create script, preview toggle, teleprompter launch, play/pause |
+| `script-management.spec.ts` | Edit existing script, preserve content, delete, multi-script display, start correct script |
+| `workflow.spec.ts` | Full create → preview → edit → teleprompter workflow with all controls; multi-script launch & delete |
+| `teleprompter-controls.spec.ts` | Speed/font sliders, mirror mode, frame editor, controls hide/show, keyboard shortcuts (Space, M, H, F), tap-to-pause, frame drag in mirror mode |
+| `mobile.spec.ts` | Mobile viewport: launch, play, speed/font controls, mirror, hide/show, full mobile workflow, multi-script |
+| **`big-e2e.spec.ts`** | **Comprehensive E2E with video proof**: create 3 scripts (manual, PDF import, DOCX import), play with settings, share session to another browser page (PeerJS mock via BroadcastChannel), verify transferred offset & settings, continue playing on receiver, verify persistence after close/reopen, transfer all scripts to new instance |
+
+Tests run across 3 Playwright projects: Desktop Chrome, Pixel 7 portrait, and Pixel 7 landscape. The big E2E test runs only on Desktop Chrome.
 
 ## AI / MCP Browser Automation
 
