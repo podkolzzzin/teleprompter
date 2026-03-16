@@ -28,9 +28,7 @@
     <!-- Controls overlay -->
     <div class="controls" @click.stop>
       <!-- Timeline progress bar -->
-      <div class="timeline" @click.stop="onTimelineClick" @pointerdown.stop title="Timeline — click to seek">
-        <div class="timeline-fill" :style="{ width: scrollProgress + '%' }"></div>
-      </div>
+      <ScrollTimeline :progress="scrollProgress" :timeLeft="timeLeft" @seek="onTimelineSeek" />
 
       <div class="controls-inner">
         <button class="ctrl-btn back-btn" @click="router.push('/')" title="Back">
@@ -158,6 +156,7 @@ import { marked } from 'marked'
 import { getScript } from '../storage/db'
 import ShareModal from './ShareModal.vue'
 import SessionModal from './SessionModal.vue'
+import ScrollTimeline from './ScrollTimeline.vue'
 import { useRemoteHost, useShareHost, type RemoteCommand } from '../composables/useRemoteControl'
 
 const router = useRouter()
@@ -179,6 +178,47 @@ const scrollEl = ref<HTMLElement | null>(null)
 let rafId: number | null = null
 let lastTime: number | null = null
 
+// ── Scroll progress & timeline ────────────────────────────────────────────────
+const scrollProgress = ref(0)  // 0–1
+const timeLeft = ref(-1)        // seconds remaining at current speed
+
+function updateScrollProgress() {
+  if (!scrollEl.value) return
+  const { scrollTop, scrollHeight, clientHeight } = scrollEl.value
+  const maxScroll = scrollHeight - clientHeight
+  scrollProgress.value = maxScroll > 0 ? scrollTop / maxScroll : 0
+  const pps = speed.value * 20
+  timeLeft.value = pps > 0 && maxScroll > 0 ? Math.max(0, maxScroll - scrollTop) / pps : -1
+  maybeScrollBroadcast()
+}
+
+function onTimelineSeek(progress: number) {
+  if (!scrollEl.value) return
+  const { scrollHeight, clientHeight } = scrollEl.value
+  scrollEl.value.scrollTop = progress * (scrollHeight - clientHeight)
+}
+
+// Throttled broadcast of scroll progress to remote (at most once per 100 ms)
+let lastScrollBroadcastTime = 0
+
+function buildBroadcastState() {
+  return {
+    playing: playing.value,
+    speed: speed.value,
+    fontSize: fontSize.value,
+    mirror: mirror.value,
+    scrollProgress: scrollProgress.value,
+    timeLeft: timeLeft.value,
+  }
+}
+
+function maybeScrollBroadcast() {
+  const now = performance.now()
+  if (now - lastScrollBroadcastTime < 100) return
+  lastScrollBroadcastTime = now
+  broadcastState(buildBroadcastState())
+}
+
 // ── Remote control (smartphone controls the teleprompter) ─────────────────────
 function handleRemoteCommand(cmd: RemoteCommand) {
   if (cmd.type === 'togglePlay') togglePlay()
@@ -190,6 +230,10 @@ function handleRemoteCommand(cmd: RemoteCommand) {
   else if (cmd.type === 'reset' && scrollEl.value) scrollEl.value.scrollTo({ top: 0, behavior: 'smooth' })
   else if (cmd.type === 'scrollUp' && scrollEl.value) scrollEl.value.scrollBy({ top: -120, behavior: 'smooth' })
   else if (cmd.type === 'scrollDown' && scrollEl.value) scrollEl.value.scrollBy({ top: 120, behavior: 'smooth' })
+  else if (cmd.type === 'seek' && scrollEl.value) {
+    const { scrollHeight, clientHeight } = scrollEl.value
+    scrollEl.value.scrollTop = cmd.progress * (scrollHeight - clientHeight)
+  }
 }
 
 const { peerId: remotePeerId, connected: remoteConnected, init: initRemoteHost, broadcastState } =
@@ -215,13 +259,8 @@ let broadcastTimer: ReturnType<typeof setTimeout> | null = null
 watch([playing, speed, fontSize, mirror], () => {
   if (broadcastTimer) clearTimeout(broadcastTimer)
   broadcastTimer = setTimeout(() => {
-    broadcastState({
-      playing: playing.value,
-      speed: speed.value,
-      fontSize: fontSize.value,
-      mirror: mirror.value,
-    })
-  }, 50)
+      broadcastState(buildBroadcastState())
+    }, 50)
 })
 
 // ── Session share (share current session state to another device) ─────────────
@@ -289,11 +328,13 @@ onMounted(async () => {
   }
   loading.value = false
   window.addEventListener('keydown', handleKey)
+  scrollEl.value?.addEventListener('scroll', updateScrollProgress)
 })
 
 onUnmounted(() => {
   stopScroll()
   window.removeEventListener('keydown', handleKey)
+  scrollEl.value?.removeEventListener('scroll', updateScrollProgress)
   document.removeEventListener('pointermove', onFramePointerMove)
   document.removeEventListener('pointerup', onFramePointerUp)
 })
@@ -431,12 +472,13 @@ function onFramePointerUp() {
   document.removeEventListener('pointerup', onFramePointerUp)
 }
 
-// Restart RAF when speed changes while playing
+// Restart RAF when speed changes while playing; also recalculate timeLeft
 watch(speed, () => {
   if (playing.value) {
     stopScroll()
     startScroll()
   }
+  updateScrollProgress()
 })
 </script>
 
@@ -485,9 +527,14 @@ watch(speed, () => {
   left: 0;
   right: 0;
   background: linear-gradient(transparent, rgba(0, 0, 0, 0.9));
-  padding: 24px 16px 16px;
+  padding: 16px 16px 16px;
   transition: opacity 0.3s, transform 0.3s;
   z-index: 20;
+}
+
+.controls :deep(.scroll-timeline) {
+  max-width: 900px;
+  margin: 0 auto 12px;
 }
 
 .controls-hidden .controls {
