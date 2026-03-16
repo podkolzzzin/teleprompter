@@ -182,9 +182,9 @@ function handleRemoteCommand(cmd: RemoteCommand) {
   else if (cmd.type === 'fontUp') fontSize.value = Math.min(96, fontSize.value + 4)
   else if (cmd.type === 'fontDown') fontSize.value = Math.max(24, fontSize.value - 4)
   else if (cmd.type === 'toggleMirror') mirror.value = !mirror.value
-  else if (cmd.type === 'reset' && scrollEl.value) scrollEl.value.scrollTop = 0
-  else if (cmd.type === 'scrollUp' && scrollEl.value) scrollEl.value.scrollTop = Math.max(0, scrollEl.value.scrollTop - 120)
-  else if (cmd.type === 'scrollDown' && scrollEl.value) scrollEl.value.scrollTop += 120
+  else if (cmd.type === 'reset' && scrollEl.value) scrollEl.value.scrollTo({ top: 0, behavior: 'smooth' })
+  else if (cmd.type === 'scrollUp' && scrollEl.value) scrollEl.value.scrollBy({ top: -120, behavior: 'smooth' })
+  else if (cmd.type === 'scrollDown' && scrollEl.value) scrollEl.value.scrollBy({ top: 120, behavior: 'smooth' })
 }
 
 const { peerId: remotePeerId, connected: remoteConnected, init: initRemoteHost, broadcastState } =
