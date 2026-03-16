@@ -102,6 +102,9 @@ test.describe('Teleprompter controls', () => {
   test('keyboard shortcut Space toggles play/pause', async ({ page }) => {
     await expect(page.getByTitle('Play')).toBeVisible()
 
+    // Ensure keyboard events reach the window by focusing the page
+    await page.evaluate(() => window.focus())
+
     // Press space to play
     await page.keyboard.press('Space')
     await expect(page.getByTitle('Pause')).toBeVisible()
@@ -113,6 +116,9 @@ test.describe('Teleprompter controls', () => {
 
   test('keyboard shortcut M toggles mirror', async ({ page }) => {
     await expect(page.locator('.tp-root')).not.toHaveClass(/mirrored/)
+
+    // Ensure keyboard events reach the window by focusing the page
+    await page.evaluate(() => window.focus())
 
     // Press M to enable mirror
     await page.keyboard.press('m')
@@ -126,6 +132,9 @@ test.describe('Teleprompter controls', () => {
   test('keyboard shortcut H toggles controls visibility', async ({ page }) => {
     await expect(page.locator('.tp-root')).not.toHaveClass(/controls-hidden/)
 
+    // Ensure keyboard events reach the window by focusing the page
+    await page.evaluate(() => window.focus())
+
     // Press H to hide controls
     await page.keyboard.press('h')
     await expect(page.locator('.tp-root')).toHaveClass(/controls-hidden/)
@@ -137,6 +146,9 @@ test.describe('Teleprompter controls', () => {
 
   test('keyboard shortcut F toggles frame editor', async ({ page }) => {
     await expect(page.locator('.frame-edit-overlay')).not.toBeVisible()
+
+    // Ensure keyboard events reach the window by focusing the page
+    await page.evaluate(() => window.focus())
 
     // Press F to open frame editor
     await page.keyboard.press('f')
@@ -192,6 +204,37 @@ test.describe('Teleprompter controls', () => {
   })
 
   test('frame editor drag works correctly in mirror mode', async ({ page }) => {
+    const viewportWidth = await page.evaluate(() => window.innerWidth)
+
+    // On narrow viewports (mobile), the default areaWidth (900px) exceeds the viewport width,
+    // making clampOffset lock offset to 0 so dragging has no effect.
+    // Shrink the frame first (without mirror) so it fits within the viewport.
+    if (viewportWidth < 900) {
+      await page.getByTitle('Edit prompter frame (F)').click()
+      await expect(page.locator('.frame-edit-overlay')).toBeVisible()
+
+      // Shrink frame to 60% of viewport using dispatchEvent (handles are off-screen).
+      // Events must be dispatched in separate evaluate calls so Vue's reactivity
+      // can process state changes between pointerdown and pointermove.
+      const targetWidth = Math.floor(viewportWidth * 0.6)
+      const startX = Math.floor(900 / 2 + viewportWidth / 2)
+      const endX = startX - (900 - targetWidth)
+      await page.evaluate((sx) => {
+        const handle = document.querySelector('.frame-handle-right') as HTMLElement
+        handle?.dispatchEvent(new PointerEvent('pointerdown', { clientX: sx, clientY: 400, bubbles: true, cancelable: true }))
+      }, startX)
+      await page.evaluate((ex) => {
+        document.dispatchEvent(new PointerEvent('pointermove', { clientX: ex, clientY: 400, bubbles: true, cancelable: true }))
+      }, endX)
+      await page.evaluate((ex) => {
+        document.dispatchEvent(new PointerEvent('pointerup', { clientX: ex, clientY: 400, bubbles: true, cancelable: true }))
+      }, endX)
+
+      // Close frame editor, then enable mirror and reopen
+      await page.getByTitle('Edit prompter frame (F)').click()
+      await expect(page.locator('.frame-edit-overlay')).not.toBeVisible()
+    }
+
     // Enable mirror and frame editor
     await page.getByTitle('Mirror mode (M)').click()
     await expect(page.locator('.tp-root')).toHaveClass(/mirrored/)
@@ -204,17 +247,20 @@ test.describe('Teleprompter controls', () => {
 
     const initialMargin = await getContentMarginLeft()
 
-    // Drag the frame move zone to the right
+    // Drag the frame move zone to the left.
+    // In mirror mode dx is negated, so dragging left increases the internal offset.
+    // On mobile the resize step leaves the offset at the negative clamp limit,
+    // so only a drag that increases offset will produce a visible change.
     const moveZone = page.locator('.frame-move-zone')
     const box = await moveZone.boundingBox()
     expect(box).not.toBeNull()
 
     await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2)
     await page.mouse.down()
-    await page.mouse.move(box!.x + box!.width / 2 + 100, box!.y + box!.height / 2, { steps: 5 })
+    await page.mouse.move(box!.x + box!.width / 2 - 100, box!.y + box!.height / 2, { steps: 5 })
     await page.mouse.up()
 
-    // After dragging right in mirror mode, the internal offset should decrease
+    // After dragging left in mirror mode, the internal offset increases
     // (because dx is negated), so the content marginLeft should change
     const newMargin = await getContentMarginLeft()
     expect(newMargin).not.toEqual(initialMargin)

@@ -81,6 +81,7 @@
           ↔ Mirror
         </button>
 
+        <!-- Remote control share button -->
         <button
           class="ctrl-btn share-btn"
           :class="{ active: remoteConnected }"
@@ -88,6 +89,15 @@
           title="Share remote control"
         >
           📲 Share
+        </button>
+
+        <!-- Session share button -->
+        <button
+          class="ctrl-btn session-share-btn"
+          @click="openSessionShare"
+          title="Share this session (S)"
+        >
+          📤 Session
         </button>
 
         <button class="ctrl-btn hide-btn" @click="controlsHidden = !controlsHidden" title="Toggle controls">
@@ -104,12 +114,27 @@
       ⚙
     </button>
 
+    <!-- Remote control share modal -->
     <ShareModal
       v-if="showShareModal"
-      :shareUrl="shareUrl"
+      :shareUrl="remoteUrl"
       :connected="remoteConnected"
       @close="showShareModal = false"
     />
+
+    <!-- Session share modal -->
+    <SessionModal
+      v-if="sessionShareOpen"
+      :url="sessionShareUrl"
+      :status="sessionShareStatus"
+      :error-message="sessionShareError"
+      @close="closeSessionShare"
+    >
+      <template #title>
+        <h2 class="modal-title">📤 Share Session</h2>
+        <p class="modal-desc">Scan the QR code or share the link to let someone view this exact teleprompter session on their device.</p>
+      </template>
+    </SessionModal>
 
     <div v-if="loading" class="loading">Loading…</div>
   </div>
@@ -121,7 +146,8 @@ import { useRouter, useRoute } from 'vue-router'
 import { marked } from 'marked'
 import { getScript } from '../storage/db'
 import ShareModal from './ShareModal.vue'
-import { useRemoteHost, type RemoteCommand } from '../composables/useRemoteControl'
+import SessionModal from './SessionModal.vue'
+import { useRemoteHost, useShareHost, type RemoteCommand } from '../composables/useRemoteControl'
 
 const router = useRouter()
 const route = useRoute()
@@ -142,6 +168,7 @@ const scrollEl = ref<HTMLElement | null>(null)
 let rafId: number | null = null
 let lastTime: number | null = null
 
+// ── Remote control (smartphone controls the teleprompter) ─────────────────────
 function handleRemoteCommand(cmd: RemoteCommand) {
   if (cmd.type === 'togglePlay') togglePlay()
   else if (cmd.type === 'speedUp') speed.value = Math.min(20, speed.value + 1)
@@ -152,16 +179,16 @@ function handleRemoteCommand(cmd: RemoteCommand) {
   else if (cmd.type === 'reset' && scrollEl.value) scrollEl.value.scrollTop = 0
 }
 
-const { peerId, connected: remoteConnected, init: initRemoteHost, broadcastState } =
+const { peerId: remotePeerId, connected: remoteConnected, init: initRemoteHost, broadcastState } =
   useRemoteHost(handleRemoteCommand)
 
-const shareUrl = computed(() => {
-  if (!peerId.value) return ''
-  return `${window.location.origin}/remote/${peerId.value}`
+const remoteUrl = computed(() => {
+  if (!remotePeerId.value) return ''
+  return `${window.location.origin}/remote/${remotePeerId.value}`
 })
 
 function openShareModal() {
-  if (!peerId.value) initRemoteHost()
+  if (!remotePeerId.value) initRemoteHost()
   showShareModal.value = true
 }
 
@@ -179,6 +206,47 @@ watch([playing, speed, fontSize, mirror], () => {
   }, 50)
 })
 
+// ── Session share (share current session state to another device) ─────────────
+const sessionShareOpen = ref(false)
+const { peerId: sessionPeerId, status: sessionShareHostStatus, error: sessionShareHostError, start: startShareHost, send: sendSession, stop: stopShareHost } = useShareHost()
+const sessionShareUrl = ref('')
+const sessionShareStatus = computed(() => sessionShareHostStatus.value)
+const sessionShareError = computed(() => sessionShareHostError.value)
+
+async function openSessionShare() {
+  sessionShareOpen.value = true
+  try {
+    await startShareHost()
+    sessionShareUrl.value = `${window.location.origin}/share/${sessionPeerId.value}`
+  } catch {
+    // error state is set in the composable
+  }
+}
+
+watch(sessionShareHostStatus, (newStatus) => {
+  if (newStatus === 'connected') {
+    sendSession({
+      type: 'session',
+      content: rawContent.value,
+      settings: {
+        speed: speed.value,
+        fontSize: fontSize.value,
+        mirror: mirror.value,
+        areaWidth: areaWidth.value,
+        areaOffsetX: areaOffsetX.value,
+      },
+      scrollOffset: scrollEl.value?.scrollTop ?? 0,
+    })
+  }
+})
+
+function closeSessionShare() {
+  sessionShareOpen.value = false
+  stopShareHost()
+  sessionShareUrl.value = ''
+}
+
+// ── Rendered content ──────────────────────────────────────────────────────────
 const renderedContent = computed(() => {
   return marked.parse(rawContent.value || '') as string
 })
@@ -280,6 +348,8 @@ function handleKey(e: KeyboardEvent) {
     controlsHidden.value = !controlsHidden.value
   } else if (e.key === 'f' || e.key === 'F') {
     editingFrame.value = !editingFrame.value
+  } else if (e.key === 's' || e.key === 'S') {
+    if (!sessionShareOpen.value) openSessionShare()
   } else if (e.key === 'r' || e.key === 'R') {
     if (scrollEl.value) scrollEl.value.scrollTop = 0
   } else if (e.code === 'Escape') {
@@ -451,6 +521,17 @@ watch(speed, () => {
   background: rgba(74, 222, 128, 0.25);
   border-color: var(--accent);
   color: var(--accent);
+}
+
+.session-share-btn {
+  background: rgba(74, 222, 128, 0.15);
+  border-color: rgba(74, 222, 128, 0.3);
+  color: var(--accent);
+}
+
+.session-share-btn:hover {
+  background: rgba(74, 222, 128, 0.25);
+  opacity: 1;
 }
 
 .ctrl-group {
@@ -694,6 +775,18 @@ watch(speed, () => {
   border: none;
   border-top: 1px solid #333;
   margin: 1em 0;
+}
+
+.modal-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.modal-desc {
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.5;
 }
 
 @media (max-width: 640px) {

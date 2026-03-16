@@ -4,6 +4,7 @@
       <h1 class="logo">📺 Teleprompter</h1>
       <div class="header-actions">
         <button class="btn-import" @click="fileInput?.click()">📄 Import</button>
+        <button class="btn-transfer" @click="openTransfer" :disabled="scripts.length === 0" title="Transfer all scripts to another device">📲 Transfer</button>
         <button class="btn-accent" @click="router.push('/edit')">+ New Script</button>
       </div>
       <input
@@ -15,6 +16,20 @@
       />
     </header>
     <p v-if="importError" class="import-error">{{ importError }}</p>
+
+    <!-- Transfer modal -->
+    <SessionModal
+      v-if="transferModalOpen"
+      :url="transferUrl"
+      :status="transferStatus"
+      :error-message="transferError"
+      @close="closeTransfer"
+    >
+      <template #title>
+        <h2 class="modal-title">📲 Transfer Scripts</h2>
+        <p class="modal-desc">Scan the QR code or open the link on your other device to transfer all {{ scripts.length }} script{{ scripts.length !== 1 ? 's' : '' }}.</p>
+      </template>
+    </SessionModal>
 
     <main class="content">
       <div v-if="scripts.length === 0" class="empty-state">
@@ -43,15 +58,54 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { getAllScripts, deleteScript, saveScript, type Script } from '../storage/db'
 import { convertFileToMarkdown, isSupportedFile } from '../utils/fileConverter'
+import { useShareHost } from '../composables/useRemoteControl'
+import SessionModal from './SessionModal.vue'
 
 const router = useRouter()
 const scripts = ref<Script[]>([])
 const fileInput = ref<HTMLInputElement | null>(null)
 const importError = ref('')
+
+// Transfer feature
+const transferModalOpen = ref(false)
+const { peerId: transferPeerId, status: transferHostStatus, error: transferHostError, start: startTransferHost, send: sendTransfer, stop: stopTransferHost } = useShareHost()
+const transferUrl = ref('')
+const transferStatus = computed(() => transferHostStatus.value)
+const transferError = computed(() => transferHostError.value)
+
+async function openTransfer() {
+  transferModalOpen.value = true
+  try {
+    await startTransferHost()
+    transferUrl.value = `${window.location.origin}/transfer/${transferPeerId.value}`
+  } catch {
+    // error state is set in the composable
+  }
+}
+
+watch(transferHostStatus, (newStatus) => {
+  if (newStatus === 'connected') {
+    sendTransfer({
+      type: 'transfer',
+      scripts: scripts.value.map(({ title, content, createdAt, updatedAt }) => ({
+        title,
+        content,
+        createdAt,
+        updatedAt,
+      })),
+    })
+  }
+})
+
+function closeTransfer() {
+  transferModalOpen.value = false
+  stopTransferHost()
+  transferUrl.value = ''
+}
 
 async function load() {
   scripts.value = await getAllScripts()
@@ -271,6 +325,30 @@ async function confirmDelete(id: number) {
 .btn-danger {
   background: var(--danger);
   color: #fff;
+}
+
+.btn-transfer {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-weight: 500;
+}
+
+.btn-transfer:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.modal-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.modal-desc {
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.5;
 }
 
 @media (max-width: 480px) {
