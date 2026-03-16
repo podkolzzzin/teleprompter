@@ -8,6 +8,7 @@ export interface TeleprompterState {
   speed: number
   fontSize: number
   mirror: boolean
+  focusOpacity: number
 }
 
 export type RemoteCommand =
@@ -32,6 +33,7 @@ export interface SessionPayload {
     mirror: boolean
     areaWidth: number
     areaOffsetX: number
+    focusOpacity: number
   }
   scrollOffset: number
 }
@@ -93,6 +95,7 @@ export function useRemoteHost(onCommand: (cmd: RemoteCommand) => void) {
       speed: state.speed,
       fontSize: state.fontSize,
       mirror: state.mirror,
+      focusOpacity: state.focusOpacity,
     }
     for (const conn of connections) {
       if (conn.open) conn.send(msg)
@@ -122,6 +125,7 @@ export function useRemoteClient() {
     speed: 5,
     fontSize: 48,
     mirror: false,
+    focusOpacity: 50,
   })
   const connected = ref(false)
   const connecting = ref(false)
@@ -150,6 +154,7 @@ export function useRemoteClient() {
             speed: msg.speed,
             fontSize: msg.fontSize,
             mirror: msg.mirror,
+            focusOpacity: msg.focusOpacity,
           }
         }
       })

@@ -1,7 +1,7 @@
 <template>
   <div class="tp-root" :class="{ mirrored: mirror, 'controls-hidden': controlsHidden }">
     <!-- Focus gradient overlay -->
-    <div class="focus-overlay"></div>
+    <div class="focus-overlay" :style="{ opacity: focusOpacity / 100 }"></div>
 
     <!-- Frame edit overlay -->
     <div v-if="editingFrame" class="frame-edit-overlay">
@@ -63,6 +63,19 @@
             title="Font size"
           />
           <span class="ctrl-value">{{ fontSize }}px</span>
+        </div>
+
+        <div class="ctrl-group">
+          <label class="ctrl-label">Focus</label>
+          <input
+            type="range"
+            min="0"
+            max="100"
+            v-model.number="focusOpacity"
+            class="ctrl-slider"
+            title="Focus opacity gradient"
+          />
+          <span class="ctrl-value">{{ focusOpacity }}%</span>
         </div>
 
         <span class="ctrl-separator" aria-hidden="true"></span>
@@ -164,6 +177,7 @@ const playing = ref(false)
 const speed = ref(5)
 const fontSize = ref(48)
 const mirror = ref(false)
+const focusOpacity = ref(50)
 const controlsHidden = ref(false)
 const editingFrame = ref(false)
 const areaWidth = ref(900)
@@ -207,7 +221,7 @@ watch(remoteConnected, (connected) => {
 
 // Broadcast state changes to remote controllers (throttled to avoid excessive sends)
 let broadcastTimer: ReturnType<typeof setTimeout> | null = null
-watch([playing, speed, fontSize, mirror], () => {
+watch([playing, speed, fontSize, mirror, focusOpacity], () => {
   if (broadcastTimer) clearTimeout(broadcastTimer)
   broadcastTimer = setTimeout(() => {
     broadcastState({
@@ -215,6 +229,7 @@ watch([playing, speed, fontSize, mirror], () => {
       speed: speed.value,
       fontSize: fontSize.value,
       mirror: mirror.value,
+      focusOpacity: focusOpacity.value,
     })
   }, 50)
 })
@@ -247,6 +262,7 @@ watch(sessionShareHostStatus, (newStatus) => {
         mirror: mirror.value,
         areaWidth: areaWidth.value,
         areaOffsetX: areaOffsetX.value,
+        focusOpacity: focusOpacity.value,
       },
       scrollOffset: scrollEl.value?.scrollTop ?? 0,
     })
@@ -626,12 +642,14 @@ watch(speed, () => {
   z-index: 10;
   background: linear-gradient(
     to bottom,
-    rgba(0, 0, 0, 0.6) 0%,
-    rgba(0, 0, 0, 0.15) 25%,
-    transparent 40%,
-    transparent 60%,
-    rgba(0, 0, 0, 0.15) 75%,
-    rgba(0, 0, 0, 0.6) 100%
+    rgba(0, 0, 0, 0.95) 0%,
+    rgba(0, 0, 0, 0.85) 30%,
+    rgba(0, 0, 0, 0.4) 42%,
+    transparent 48%,
+    transparent 52%,
+    rgba(0, 0, 0, 0.4) 58%,
+    rgba(0, 0, 0, 0.85) 70%,
+    rgba(0, 0, 0, 0.95) 100%
   );
 }
 
