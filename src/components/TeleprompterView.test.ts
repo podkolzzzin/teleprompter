@@ -130,10 +130,10 @@ describe('TeleprompterView', () => {
 
     expect(wrapper.find('.tp-root').classes()).not.toContain('mirrored')
 
-    await wrapper.find('.mirror-btn').trigger('click')
+    await wrapper.find('[title="Mirror mode (M)"]').trigger('click')
     expect(wrapper.find('.tp-root').classes()).toContain('mirrored')
 
-    await wrapper.find('.mirror-btn').trigger('click')
+    await wrapper.find('[title="Mirror mode (M)"]').trigger('click')
     expect(wrapper.find('.tp-root').classes()).not.toContain('mirrored')
   })
 
@@ -231,11 +231,11 @@ describe('TeleprompterView', () => {
 
     expect(wrapper.find('.frame-edit-overlay').exists()).toBe(false)
 
-    await wrapper.find('.frame-btn').trigger('click')
+    await wrapper.find('[title="Edit prompter frame (F)"]').trigger('click')
     expect(wrapper.find('.frame-edit-overlay').exists()).toBe(true)
-    expect(wrapper.find('.frame-btn').classes()).toContain('active')
+    expect(wrapper.find('[title="Edit prompter frame (F)"]').classes()).toContain('active')
 
-    await wrapper.find('.frame-btn').trigger('click')
+    await wrapper.find('[title="Edit prompter frame (F)"]').trigger('click')
     expect(wrapper.find('.frame-edit-overlay').exists()).toBe(false)
   })
 
@@ -379,6 +379,6 @@ describe('TeleprompterView', () => {
 
     const shareBtn = wrapper.find('.share-btn')
     expect(shareBtn.exists()).toBe(true)
-    expect(shareBtn.text()).toContain('Share')
+    expect(shareBtn.text()).toContain('Remote control')
   })
 })

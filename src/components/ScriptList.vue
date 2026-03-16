@@ -31,6 +31,20 @@
       </template>
     </SessionModal>
 
+    <!-- Share single script modal -->
+    <SessionModal
+      v-if="scriptShareOpen"
+      :url="scriptShareUrl"
+      :status="scriptShareStatus"
+      :error-message="scriptShareError"
+      @close="closeScriptShare"
+    >
+      <template #title>
+        <h2 class="modal-title">📤 Share Script</h2>
+        <p class="modal-desc">Scan the QR code or open the link on another device to share "{{ sharingScriptTitle }}".</p>
+      </template>
+    </SessionModal>
+
     <main class="content">
       <div v-if="scripts.length === 0" class="empty-state">
         <p class="empty-icon">📝</p>
@@ -49,6 +63,7 @@
           <div class="card-actions">
             <button class="btn-start" @click.stop="router.push(`/teleprompter/${script.id}`)">▶ Start</button>
             <button class="btn-edit" @click.stop="router.push(`/edit/${script.id}`)">✏ Edit</button>
+            <button class="btn-share" @click.stop="openScriptShare(script)" title="Share this script">📤 Share</button>
             <button class="btn-danger" @click.stop="confirmDelete(script.id!)">🗑 Delete</button>
           </div>
         </li>
@@ -76,6 +91,15 @@ const { peerId: transferPeerId, status: transferHostStatus, error: transferHostE
 const transferUrl = ref('')
 const transferStatus = computed(() => transferHostStatus.value)
 const transferError = computed(() => transferHostError.value)
+
+// Share single script feature
+const scriptShareOpen = ref(false)
+const sharingScriptTitle = ref('')
+const sharingScript = ref<Script | null>(null)
+const { peerId: scriptSharePeerId, status: scriptShareHostStatus, error: scriptShareHostError, start: startScriptShareHost, send: sendScriptShare, stop: stopScriptShareHost } = useShareHost()
+const scriptShareUrl = ref('')
+const scriptShareStatus = computed(() => scriptShareHostStatus.value)
+const scriptShareError = computed(() => scriptShareHostError.value)
 
 async function openTransfer() {
   transferModalOpen.value = true
@@ -105,6 +129,41 @@ function closeTransfer() {
   transferModalOpen.value = false
   stopTransferHost()
   transferUrl.value = ''
+}
+
+async function openScriptShare(script: Script) {
+  sharingScript.value = script
+  sharingScriptTitle.value = script.title || 'Untitled'
+  scriptShareOpen.value = true
+  try {
+    await startScriptShareHost()
+    scriptShareUrl.value = `${window.location.origin}/transfer/${scriptSharePeerId.value}`
+  } catch {
+    // error state is set in the composable
+  }
+}
+
+watch(scriptShareHostStatus, (newStatus) => {
+  if (newStatus === 'connected' && sharingScript.value) {
+    const s = sharingScript.value
+    sendScriptShare({
+      type: 'transfer',
+      scripts: [{
+        title: s.title,
+        content: s.content,
+        createdAt: s.createdAt,
+        updatedAt: s.updatedAt,
+      }],
+    })
+  }
+})
+
+function closeScriptShare() {
+  scriptShareOpen.value = false
+  stopScriptShareHost()
+  scriptShareUrl.value = ''
+  sharingScript.value = null
+  sharingScriptTitle.value = ''
 }
 
 async function load() {
@@ -320,6 +379,13 @@ async function confirmDelete(id: number) {
 .btn-edit {
   background: #3b82f6;
   color: #fff;
+}
+
+.btn-share {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-weight: 500;
 }
 
 .btn-danger {

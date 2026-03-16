@@ -32,6 +32,8 @@
           ←
         </button>
 
+        <span class="ctrl-separator" aria-hidden="true"></span>
+
         <button class="ctrl-btn play-btn" @click="togglePlay" :title="playing ? 'Pause' : 'Play'">
           {{ playing ? '⏸' : '▶' }}
         </button>
@@ -63,32 +65,36 @@
           <span class="ctrl-value">{{ fontSize }}px</span>
         </div>
 
+        <span class="ctrl-separator" aria-hidden="true"></span>
+
         <button
-          class="ctrl-btn frame-btn"
+          class="ctrl-btn icon-btn"
           :class="{ active: editingFrame }"
           @click="editingFrame = !editingFrame"
           title="Edit prompter frame (F)"
         >
-          ⬜ Frame
+          ⬜
         </button>
 
         <button
-          class="ctrl-btn mirror-btn"
+          class="ctrl-btn icon-btn"
           :class="{ active: mirror }"
           @click="mirror = !mirror"
           title="Mirror mode (M)"
         >
-          ↔ Mirror
+          ↔
         </button>
+
+        <span class="ctrl-separator" aria-hidden="true"></span>
 
         <!-- Remote control share button -->
         <button
           class="ctrl-btn share-btn"
           :class="{ active: remoteConnected }"
           @click="openShareModal"
-          title="Share remote control"
+          title="Remote control"
         >
-          📲 Share
+          📲 Remote control
         </button>
 
         <!-- Session share button -->
@@ -100,7 +106,7 @@
           📤 Session
         </button>
 
-        <button class="ctrl-btn hide-btn" @click="controlsHidden = !controlsHidden" title="Toggle controls">
+        <button class="ctrl-btn icon-btn hide-btn" @click="controlsHidden = !controlsHidden" title="Toggle controls">
           {{ controlsHidden ? '⚙' : '✕' }}
         </button>
       </div>
@@ -177,6 +183,8 @@ function handleRemoteCommand(cmd: RemoteCommand) {
   else if (cmd.type === 'fontDown') fontSize.value = Math.max(24, fontSize.value - 4)
   else if (cmd.type === 'toggleMirror') mirror.value = !mirror.value
   else if (cmd.type === 'reset' && scrollEl.value) scrollEl.value.scrollTop = 0
+  else if (cmd.type === 'scrollUp' && scrollEl.value) scrollEl.value.scrollTop = Math.max(0, scrollEl.value.scrollTop - 120)
+  else if (cmd.type === 'scrollDown' && scrollEl.value) scrollEl.value.scrollTop += 120
 }
 
 const { peerId: remotePeerId, connected: remoteConnected, init: initRemoteHost, broadcastState } =
@@ -503,18 +511,31 @@ watch(speed, () => {
   opacity: 1;
 }
 
+.ctrl-btn.icon-btn {
+  padding: 10px 12px;
+  min-width: 44px;
+  text-align: center;
+}
+
+.ctrl-btn.icon-btn.active {
+  background: rgba(74, 222, 128, 0.25);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.ctrl-separator {
+  width: 1px;
+  height: 24px;
+  background: rgba(255, 255, 255, 0.15);
+  flex-shrink: 0;
+}
+
 .play-btn {
   background: var(--accent);
   color: #111;
   border-color: transparent;
   font-size: 20px;
   min-width: 52px;
-}
-
-.mirror-btn.active {
-  background: rgba(74, 222, 128, 0.25);
-  border-color: var(--accent);
-  color: var(--accent);
 }
 
 .share-btn.active {
@@ -718,12 +739,6 @@ watch(speed, () => {
   font-size: 14px;
   white-space: nowrap;
   pointer-events: none;
-}
-
-.frame-btn.active {
-  background: rgba(74, 222, 128, 0.25);
-  border-color: var(--accent);
-  color: var(--accent);
 }
 
 .loading {

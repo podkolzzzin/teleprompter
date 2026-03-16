@@ -24,6 +24,13 @@
         {{ state.playing ? '⏸ Pause' : '▶ Play' }}
       </button>
 
+      <!-- Scroll nudge -->
+      <div class="control-row scroll-row">
+        <span class="control-label">Scroll</span>
+        <button class="remote-btn small-btn" @click="send({ type: 'scrollUp' })" title="Scroll up">↑</button>
+        <button class="remote-btn small-btn" @click="send({ type: 'scrollDown' })" title="Scroll down">↓</button>
+      </div>
+
       <!-- Speed -->
       <div class="control-row">
         <span class="control-label">Speed</span>
@@ -190,6 +197,17 @@ onMounted(() => {
   text-align: center;
   font-size: 18px;
   font-weight: 600;
+}
+
+.scroll-row {
+  justify-content: center;
+  gap: 16px;
+}
+
+.scroll-row .small-btn {
+  flex: 1;
+  border-radius: 12px;
+  max-width: 120px;
 }
 
 .small-btn {
