@@ -60,6 +60,9 @@
             <p class="card-preview">{{ preview(script.content) }}</p>
             <p class="card-date">{{ formatDate(script.createdAt) }}</p>
           </div>
+          <div v-if="script.scrollProgress && script.scrollProgress > 0" class="progress-bar">
+            <div class="progress-fill" :style="{ width: (script.scrollProgress * 100) + '%' }"></div>
+          </div>
           <div class="card-actions">
             <button class="btn-start" @click.stop="router.push(`/teleprompter/${script.id}`)">▶ Start</button>
             <button class="btn-edit" @click.stop="router.push(`/edit/${script.id}`)">✏ Edit</button>
@@ -354,6 +357,18 @@ async function confirmDelete(id: number) {
 .card-date {
   font-size: 12px;
   color: var(--text-muted);
+}
+
+.progress-bar {
+  height: 3px;
+  background: var(--border);
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 0 1px 1px 0;
+  transition: width 0.3s;
 }
 
 .card-actions {

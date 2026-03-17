@@ -160,10 +160,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, onUnmounted, watch, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { marked } from 'marked'
-import { getScript } from '../storage/db'
+import { getScript, updateScrollProgress } from '../storage/db'
 import ShareModal from './ShareModal.vue'
 import SessionModal from './SessionModal.vue'
 import { useRemoteHost, useShareHost, type RemoteCommand } from '../composables/useRemoteControl'
@@ -187,6 +187,31 @@ const showShareModal = ref(false)
 const scrollEl = ref<HTMLElement | null>(null)
 let rafId: number | null = null
 let lastTime: number | null = null
+const scriptId = ref<number | null>(null)
+
+// ── Auto-save scroll progress ─────────────────────────────────────────────────
+function getScrollProgress(): number {
+  if (!scrollEl.value) return 0
+  const el = scrollEl.value
+  const maxScroll = el.scrollHeight - el.clientHeight
+  if (maxScroll <= 0) return 0
+  return Math.min(1, el.scrollTop / maxScroll)
+}
+
+let saveTimer: ReturnType<typeof setTimeout> | null = null
+function scheduleSaveProgress() {
+  if (!scriptId.value) return
+  if (saveTimer) clearTimeout(saveTimer)
+  saveTimer = setTimeout(() => {
+    if (scriptId.value) {
+      updateScrollProgress(scriptId.value, getScrollProgress())
+    }
+  }, 500)
+}
+
+function onScroll() {
+  scheduleSaveProgress()
+}
 
 // ── Remote control (smartphone controls the teleprompter) ─────────────────────
 function handleRemoteCommand(cmd: RemoteCommand) {
@@ -293,17 +318,35 @@ const frameBoxStyle = computed(() => ({
 onMounted(async () => {
   const id = Number(route.params.id)
   if (id) {
+    scriptId.value = id
     const script = await getScript(id)
     if (script) {
       rawContent.value = script.content
+      if (script.scrollProgress && script.scrollProgress > 0) {
+        await nextTick()
+        if (scrollEl.value) {
+          const maxScroll = scrollEl.value.scrollHeight - scrollEl.value.clientHeight
+          scrollEl.value.scrollTop = script.scrollProgress * maxScroll
+        }
+      }
     }
   }
   loading.value = false
   window.addEventListener('keydown', handleKey)
+  scrollEl.value?.addEventListener('scroll', onScroll, { passive: true })
+})
+
+onBeforeUnmount(() => {
+  // Save progress while refs are still valid
+  if (scriptId.value && scrollEl.value) {
+    updateScrollProgress(scriptId.value, getScrollProgress())
+  }
+  if (saveTimer) clearTimeout(saveTimer)
 })
 
 onUnmounted(() => {
   stopScroll()
+  scrollEl.value?.removeEventListener('scroll', onScroll)
   window.removeEventListener('keydown', handleKey)
   document.removeEventListener('pointermove', onFramePointerMove)
   document.removeEventListener('pointerup', onFramePointerUp)
