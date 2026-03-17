@@ -1,7 +1,7 @@
 <template>
   <div class="tp-root" :class="{ mirrored: mirror, 'controls-hidden': controlsHidden }">
     <!-- Focus gradient overlay -->
-    <div class="focus-overlay"></div>
+    <div class="focus-overlay" :style="{ opacity: focusOpacity / 100 }"></div>
 
     <!-- Frame edit overlay -->
     <div v-if="editingFrame" class="frame-edit-overlay">
@@ -66,6 +66,19 @@
             title="Font size"
           />
           <span class="ctrl-value">{{ fontSize }}px</span>
+        </div>
+
+        <div class="ctrl-group">
+          <label class="ctrl-label">Focus</label>
+          <input
+            type="range"
+            min="0"
+            max="100"
+            v-model.number="focusOpacity"
+            class="ctrl-slider"
+            title="Focus opacity gradient"
+          />
+          <span class="ctrl-value">{{ focusOpacity }}%</span>
         </div>
 
         <span class="ctrl-separator" aria-hidden="true"></span>
@@ -150,10 +163,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, onUnmounted, watch, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { marked } from 'marked'
-import { getScript } from '../storage/db'
+import { getScript, updateScrollProgress } from '../storage/db'
 import ShareModal from './ShareModal.vue'
 import SessionModal from './SessionModal.vue'
 import ScrollTimeline from './ScrollTimeline.vue'
@@ -168,6 +181,7 @@ const playing = ref(false)
 const speed = ref(5)
 const fontSize = ref(48)
 const mirror = ref(false)
+const focusOpacity = ref(50)
 const controlsHidden = ref(false)
 const editingFrame = ref(false)
 const areaWidth = ref(900)
@@ -177,12 +191,38 @@ const showShareModal = ref(false)
 const scrollEl = ref<HTMLElement | null>(null)
 let rafId: number | null = null
 let lastTime: number | null = null
+const scriptId = ref<number | null>(null)
+
+// ── Auto-save scroll progress ─────────────────────────────────────────────────
+function getScrollProgress(): number {
+  if (!scrollEl.value) return 0
+  const el = scrollEl.value
+  const maxScroll = el.scrollHeight - el.clientHeight
+  if (maxScroll <= 0) return 0
+  return Math.min(1, el.scrollTop / maxScroll)
+}
+
+let saveTimer: ReturnType<typeof setTimeout> | null = null
+function scheduleSaveProgress() {
+  if (!scriptId.value) return
+  if (saveTimer) clearTimeout(saveTimer)
+  saveTimer = setTimeout(() => {
+    if (scriptId.value) {
+      updateScrollProgress(scriptId.value, getScrollProgress())
+    }
+  }, 500)
+}
+
+function onScroll() {
+  scheduleSaveProgress()
+  updateTimelineProgress()
+}
 
 // ── Scroll progress & timeline ────────────────────────────────────────────────
 const scrollProgress = ref(0)  // 0–1
 const timeLeft = ref(-1)        // seconds remaining at current speed
 
-function updateScrollProgress() {
+function updateTimelineProgress() {
   if (!scrollEl.value) return
   const { scrollTop, scrollHeight, clientHeight } = scrollEl.value
   const maxScroll = scrollHeight - clientHeight
@@ -207,6 +247,7 @@ function buildBroadcastState() {
     speed: speed.value,
     fontSize: fontSize.value,
     mirror: mirror.value,
+    focusOpacity: focusOpacity.value,
     scrollProgress: scrollProgress.value,
     timeLeft: timeLeft.value,
   }
@@ -256,7 +297,7 @@ watch(remoteConnected, (connected) => {
 
 // Broadcast state changes to remote controllers (throttled to avoid excessive sends)
 let broadcastTimer: ReturnType<typeof setTimeout> | null = null
-watch([playing, speed, fontSize, mirror], () => {
+watch([playing, speed, fontSize, mirror, focusOpacity], () => {
   if (broadcastTimer) clearTimeout(broadcastTimer)
   broadcastTimer = setTimeout(() => {
       broadcastState(buildBroadcastState())
@@ -291,6 +332,7 @@ watch(sessionShareHostStatus, (newStatus) => {
         mirror: mirror.value,
         areaWidth: areaWidth.value,
         areaOffsetX: areaOffsetX.value,
+        focusOpacity: focusOpacity.value,
       },
       scrollOffset: scrollEl.value?.scrollTop ?? 0,
     })
@@ -321,20 +363,36 @@ const frameBoxStyle = computed(() => ({
 onMounted(async () => {
   const id = Number(route.params.id)
   if (id) {
+    scriptId.value = id
     const script = await getScript(id)
     if (script) {
       rawContent.value = script.content
+      if (script.scrollProgress && script.scrollProgress > 0) {
+        await nextTick()
+        if (scrollEl.value) {
+          const maxScroll = scrollEl.value.scrollHeight - scrollEl.value.clientHeight
+          scrollEl.value.scrollTop = script.scrollProgress * maxScroll
+        }
+      }
     }
   }
   loading.value = false
   window.addEventListener('keydown', handleKey)
-  scrollEl.value?.addEventListener('scroll', updateScrollProgress)
+  scrollEl.value?.addEventListener('scroll', onScroll, { passive: true })
+})
+
+onBeforeUnmount(() => {
+  // Save progress while refs are still valid
+  if (scriptId.value && scrollEl.value) {
+    updateScrollProgress(scriptId.value, getScrollProgress())
+  }
+  if (saveTimer) clearTimeout(saveTimer)
 })
 
 onUnmounted(() => {
   stopScroll()
+  scrollEl.value?.removeEventListener('scroll', onScroll)
   window.removeEventListener('keydown', handleKey)
-  scrollEl.value?.removeEventListener('scroll', updateScrollProgress)
   document.removeEventListener('pointermove', onFramePointerMove)
   document.removeEventListener('pointerup', onFramePointerUp)
 })
@@ -478,7 +536,7 @@ watch(speed, () => {
     stopScroll()
     startScroll()
   }
-  updateScrollProgress()
+  updateTimelineProgress()
 })
 </script>
 
@@ -678,12 +736,14 @@ watch(speed, () => {
   z-index: 10;
   background: linear-gradient(
     to bottom,
-    rgba(0, 0, 0, 0.6) 0%,
-    rgba(0, 0, 0, 0.15) 25%,
-    transparent 40%,
-    transparent 60%,
-    rgba(0, 0, 0, 0.15) 75%,
-    rgba(0, 0, 0, 0.6) 100%
+    rgba(0, 0, 0, 0.95) 0%,
+    rgba(0, 0, 0, 0.85) 30%,
+    rgba(0, 0, 0, 0.4) 42%,
+    transparent 48%,
+    transparent 52%,
+    rgba(0, 0, 0, 0.4) 58%,
+    rgba(0, 0, 0, 0.85) 70%,
+    rgba(0, 0, 0, 0.95) 100%
   );
 }
 

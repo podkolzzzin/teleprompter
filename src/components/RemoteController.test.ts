@@ -7,7 +7,7 @@ import RemoteController from './RemoteController.vue'
 // Mock the composable
 vi.mock('../composables/useRemoteControl', () => ({
   useRemoteClient: vi.fn(() => ({
-    state: ref({ playing: false, speed: 5, fontSize: 48, mirror: false, scrollProgress: 0, timeLeft: -1 }),
+    state: ref({ playing: false, speed: 5, fontSize: 48, mirror: false, focusOpacity: 50, scrollProgress: 0, timeLeft: -1 }),
     connected: ref(false),
     connecting: ref(true),
     error: ref(''),
@@ -37,7 +37,7 @@ describe('RemoteController', () => {
 
   it('shows connecting state initially', async () => {
     vi.mocked(useRemoteClient).mockReturnValue({
-      state: ref({ playing: false, speed: 5, fontSize: 48, mirror: false, scrollProgress: 0, timeLeft: -1 }),
+      state: ref({ playing: false, speed: 5, fontSize: 48, mirror: false, focusOpacity: 50, scrollProgress: 0, timeLeft: -1 }),
       connected: ref(false),
       connecting: ref(true),
       error: ref(''),
@@ -58,7 +58,7 @@ describe('RemoteController', () => {
 
   it('shows controls when connected', async () => {
     vi.mocked(useRemoteClient).mockReturnValue({
-      state: ref({ playing: false, speed: 5, fontSize: 48, mirror: false, scrollProgress: 0, timeLeft: -1 }),
+      state: ref({ playing: false, speed: 5, fontSize: 48, mirror: false, focusOpacity: 50, scrollProgress: 0, timeLeft: -1 }),
       connected: ref(true),
       connecting: ref(false),
       error: ref(''),
@@ -81,7 +81,7 @@ describe('RemoteController', () => {
 
   it('shows error state', async () => {
     vi.mocked(useRemoteClient).mockReturnValue({
-      state: ref({ playing: false, speed: 5, fontSize: 48, mirror: false, scrollProgress: 0, timeLeft: -1 }),
+      state: ref({ playing: false, speed: 5, fontSize: 48, mirror: false, focusOpacity: 50, scrollProgress: 0, timeLeft: -1 }),
       connected: ref(false),
       connecting: ref(false),
       error: ref('Connection failed'),
@@ -104,7 +104,7 @@ describe('RemoteController', () => {
   it('sends togglePlay command when play button clicked', async () => {
     const mockSend = vi.fn()
     vi.mocked(useRemoteClient).mockReturnValue({
-      state: ref({ playing: false, speed: 5, fontSize: 48, mirror: false, scrollProgress: 0, timeLeft: -1 }),
+      state: ref({ playing: false, speed: 5, fontSize: 48, mirror: false, focusOpacity: 50, scrollProgress: 0, timeLeft: -1 }),
       connected: ref(true),
       connecting: ref(false),
       error: ref(''),
@@ -126,7 +126,7 @@ describe('RemoteController', () => {
 
   it('shows pause label when playing', async () => {
     vi.mocked(useRemoteClient).mockReturnValue({
-      state: ref({ playing: true, speed: 5, fontSize: 48, mirror: false, scrollProgress: 0, timeLeft: -1 }),
+      state: ref({ playing: true, speed: 5, fontSize: 48, mirror: false, focusOpacity: 50, scrollProgress: 0, timeLeft: -1 }),
       connected: ref(true),
       connecting: ref(false),
       error: ref(''),
@@ -148,7 +148,7 @@ describe('RemoteController', () => {
   it('sends speed and font commands', async () => {
     const mockSend = vi.fn()
     vi.mocked(useRemoteClient).mockReturnValue({
-      state: ref({ playing: false, speed: 5, fontSize: 48, mirror: false, scrollProgress: 0, timeLeft: -1 }),
+      state: ref({ playing: false, speed: 5, fontSize: 48, mirror: false, focusOpacity: 50, scrollProgress: 0, timeLeft: -1 }),
       connected: ref(true),
       connecting: ref(false),
       error: ref(''),
@@ -188,7 +188,7 @@ describe('RemoteController', () => {
   it('sends mirror command', async () => {
     const mockSend = vi.fn()
     vi.mocked(useRemoteClient).mockReturnValue({
-      state: ref({ playing: false, speed: 5, fontSize: 48, mirror: false, scrollProgress: 0, timeLeft: -1 }),
+      state: ref({ playing: false, speed: 5, fontSize: 48, mirror: false, focusOpacity: 50, scrollProgress: 0, timeLeft: -1 }),
       connected: ref(true),
       connecting: ref(false),
       error: ref(''),
@@ -211,7 +211,7 @@ describe('RemoteController', () => {
   it('sends reset command', async () => {
     const mockSend = vi.fn()
     vi.mocked(useRemoteClient).mockReturnValue({
-      state: ref({ playing: false, speed: 5, fontSize: 48, mirror: false, scrollProgress: 0, timeLeft: -1 }),
+      state: ref({ playing: false, speed: 5, fontSize: 48, mirror: false, focusOpacity: 50, scrollProgress: 0, timeLeft: -1 }),
       connected: ref(true),
       connecting: ref(false),
       error: ref(''),
@@ -233,7 +233,7 @@ describe('RemoteController', () => {
 
   it('shows timeline when connected', async () => {
     vi.mocked(useRemoteClient).mockReturnValue({
-      state: ref({ playing: false, speed: 5, fontSize: 48, mirror: false, scrollProgress: 0.3, timeLeft: 45 }),
+      state: ref({ playing: false, speed: 5, fontSize: 48, mirror: false, focusOpacity: 50, scrollProgress: 0.3, timeLeft: 45 }),
       connected: ref(true),
       connecting: ref(false),
       error: ref(''),
@@ -257,7 +257,7 @@ describe('RemoteController', () => {
   it('sends seek command when timeline emits seek', async () => {
     const mockSend = vi.fn()
     vi.mocked(useRemoteClient).mockReturnValue({
-      state: ref({ playing: false, speed: 5, fontSize: 48, mirror: false, scrollProgress: 0, timeLeft: 60 }),
+      state: ref({ playing: false, speed: 5, fontSize: 48, mirror: false, focusOpacity: 50, scrollProgress: 0, timeLeft: 60 }),
       connected: ref(true),
       connecting: ref(false),
       error: ref(''),

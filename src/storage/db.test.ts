@@ -26,7 +26,7 @@ vi.mock('idb', () => ({
   ),
 }))
 
-import { getAllScripts, getScript, saveScript, updateScript, deleteScript } from './db'
+import { getAllScripts, getScript, saveScript, updateScript, deleteScript, updateScrollProgress } from './db'
 
 describe('storage/db', () => {
   beforeEach(() => {
@@ -106,6 +106,33 @@ describe('storage/db', () => {
 
       await deleteScript(id)
       expect(mockStore.size).toBe(0)
+    })
+  })
+
+  describe('updateScrollProgress', () => {
+    it('updates scrollProgress on an existing script', async () => {
+      const id = await saveScript({ title: 'Test', content: 'hello', createdAt: 1, updatedAt: 1 })
+      await updateScrollProgress(id, 0.5)
+
+      const script = await getScript(id)
+      expect(script!.scrollProgress).toBe(0.5)
+    })
+
+    it('does nothing for a non-existent script', async () => {
+      await updateScrollProgress(999, 0.5)
+      expect(mockStore.size).toBe(0)
+    })
+
+    it('preserves other script fields when updating progress', async () => {
+      const id = await saveScript({ title: 'Keep Me', content: '# Content', createdAt: 100, updatedAt: 200 })
+      await updateScrollProgress(id, 0.75)
+
+      const script = await getScript(id)
+      expect(script!.title).toBe('Keep Me')
+      expect(script!.content).toBe('# Content')
+      expect(script!.createdAt).toBe(100)
+      expect(script!.updatedAt).toBe(200)
+      expect(script!.scrollProgress).toBe(0.75)
     })
   })
 })

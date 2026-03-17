@@ -6,6 +6,7 @@ export interface Script {
   content: string
   createdAt: number
   updatedAt: number
+  scrollProgress?: number
 }
 
 const DB_NAME = 'teleprompter-db'
@@ -46,4 +47,13 @@ export async function updateScript(script: Script): Promise<void> {
 export async function deleteScript(id: number): Promise<void> {
   const db = await getDB()
   await db.delete(STORE_NAME, id)
+}
+
+export async function updateScrollProgress(id: number, progress: number): Promise<void> {
+  const db = await getDB()
+  const script = await db.get(STORE_NAME, id)
+  if (script) {
+    script.scrollProgress = progress
+    await db.put(STORE_NAME, script)
+  }
 }

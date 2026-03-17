@@ -8,6 +8,7 @@ export interface TeleprompterState {
   speed: number
   fontSize: number
   mirror: boolean
+  focusOpacity: number
   scrollProgress: number
   timeLeft: number
 }
@@ -35,6 +36,7 @@ export interface SessionPayload {
     mirror: boolean
     areaWidth: number
     areaOffsetX: number
+    focusOpacity: number
   }
   scrollOffset: number
 }
@@ -96,6 +98,7 @@ export function useRemoteHost(onCommand: (cmd: RemoteCommand) => void) {
       speed: state.speed,
       fontSize: state.fontSize,
       mirror: state.mirror,
+      focusOpacity: state.focusOpacity,
       scrollProgress: state.scrollProgress,
       timeLeft: state.timeLeft,
     }
@@ -127,6 +130,7 @@ export function useRemoteClient() {
     speed: 5,
     fontSize: 48,
     mirror: false,
+    focusOpacity: 50,
     scrollProgress: 0,
     timeLeft: -1,
   })
@@ -157,6 +161,7 @@ export function useRemoteClient() {
             speed: msg.speed,
             fontSize: msg.fontSize,
             mirror: msg.mirror,
+            focusOpacity: msg.focusOpacity,
             scrollProgress: msg.scrollProgress ?? 0,
             timeLeft: msg.timeLeft ?? -1,
           }
