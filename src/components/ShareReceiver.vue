@@ -13,6 +13,7 @@ const playing = ref(false)
 const speed = ref(5)
 const fontSize = ref(48)
 const mirror = ref(false)
+const focusOpacity = ref(50)
 const controlsHidden = ref(false)
 const areaWidth = ref(900)
 const areaOffsetX = ref(0)
@@ -62,6 +63,7 @@ async function applySession(session: SessionPayload) {
   mirror.value = session.settings.mirror
   areaWidth.value = session.settings.areaWidth
   areaOffsetX.value = session.settings.areaOffsetX
+  focusOpacity.value = session.settings.focusOpacity ?? 50
   await nextTick()
   if (scrollEl.value) {
     scrollEl.value.scrollTop = session.scrollOffset
@@ -135,7 +137,7 @@ function handleKey(e: KeyboardEvent) {
 
 <template>
   <div class="tp-root" :class="{ mirrored: mirror, 'controls-hidden': controlsHidden }">
-    <div class="focus-overlay"></div>
+    <div class="focus-overlay" :style="{ opacity: focusOpacity / 100 }"></div>
 
     <!-- Connecting overlay -->
     <div v-if="status === 'error' || status === 'connecting' || (status === 'connected' && !rawContent)" class="overlay">
@@ -428,12 +430,14 @@ function handleKey(e: KeyboardEvent) {
   z-index: 10;
   background: linear-gradient(
     to bottom,
-    rgba(0, 0, 0, 0.6) 0%,
-    rgba(0, 0, 0, 0.15) 25%,
-    transparent 40%,
-    transparent 60%,
-    rgba(0, 0, 0, 0.15) 75%,
-    rgba(0, 0, 0, 0.6) 100%
+    rgba(0, 0, 0, 0.95) 0%,
+    rgba(0, 0, 0, 0.85) 30%,
+    rgba(0, 0, 0, 0.4) 42%,
+    transparent 48%,
+    transparent 52%,
+    rgba(0, 0, 0, 0.4) 58%,
+    rgba(0, 0, 0, 0.85) 70%,
+    rgba(0, 0, 0, 0.95) 100%
   );
 }
 
