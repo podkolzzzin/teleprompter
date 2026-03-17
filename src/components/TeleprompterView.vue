@@ -588,11 +588,13 @@ watch(speed, () => {
   padding: 16px 16px 16px;
   transition: opacity 0.3s, transform 0.3s;
   z-index: 20;
+  pointer-events: none;
 }
 
 .controls :deep(.scroll-timeline) {
   max-width: 900px;
   margin: 0 auto 12px;
+  pointer-events: auto;
 }
 
 .controls-hidden .controls {
@@ -608,6 +610,7 @@ watch(speed, () => {
   max-width: 900px;
   margin: 0 auto;
   flex-wrap: wrap;
+  pointer-events: auto;
 }
 
 .ctrl-btn {
