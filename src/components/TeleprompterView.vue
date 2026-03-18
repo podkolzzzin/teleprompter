@@ -27,6 +27,9 @@
 
     <!-- Controls overlay -->
     <div class="controls" @click.stop>
+      <!-- Timeline progress bar -->
+      <ScrollTimeline :progress="scrollProgress" :timeLeft="timeLeft" @seek="onTimelineSeek" />
+
       <div class="controls-inner">
         <button class="ctrl-btn back-btn" @click="router.push('/')" title="Back">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
@@ -174,6 +177,7 @@ import { marked } from 'marked'
 import { getScript, updateScrollProgress } from '../storage/db'
 import ShareModal from './ShareModal.vue'
 import SessionModal from './SessionModal.vue'
+import ScrollTimeline from './ScrollTimeline.vue'
 import { useRemoteHost, useShareHost, type RemoteCommand } from '../composables/useRemoteControl'
 
 const router = useRouter()
@@ -219,6 +223,49 @@ function scheduleSaveProgress() {
 
 function onScroll() {
   scheduleSaveProgress()
+  updateTimelineProgress()
+}
+
+// ── Scroll progress & timeline ────────────────────────────────────────────────
+const scrollProgress = ref(0)  // 0–1
+const timeLeft = ref(-1)        // seconds remaining at current speed
+
+function updateTimelineProgress() {
+  if (!scrollEl.value) return
+  const { scrollTop, scrollHeight, clientHeight } = scrollEl.value
+  const maxScroll = scrollHeight - clientHeight
+  scrollProgress.value = maxScroll > 0 ? scrollTop / maxScroll : 0
+  const pps = speed.value * 20
+  timeLeft.value = pps > 0 && maxScroll > 0 ? Math.max(0, maxScroll - scrollTop) / pps : -1
+  maybeScrollBroadcast()
+}
+
+function onTimelineSeek(progress: number) {
+  if (!scrollEl.value) return
+  const { scrollHeight, clientHeight } = scrollEl.value
+  scrollEl.value.scrollTop = progress * (scrollHeight - clientHeight)
+}
+
+// Throttled broadcast of scroll progress to remote (at most once per 100 ms)
+let lastScrollBroadcastTime = 0
+
+function buildBroadcastState() {
+  return {
+    playing: playing.value,
+    speed: speed.value,
+    fontSize: fontSize.value,
+    mirror: mirror.value,
+    focusOpacity: focusOpacity.value,
+    scrollProgress: scrollProgress.value,
+    timeLeft: timeLeft.value,
+  }
+}
+
+function maybeScrollBroadcast() {
+  const now = performance.now()
+  if (now - lastScrollBroadcastTime < 100) return
+  lastScrollBroadcastTime = now
+  broadcastState(buildBroadcastState())
 }
 
 // ── Remote control (smartphone controls the teleprompter) ─────────────────────
@@ -232,6 +279,10 @@ function handleRemoteCommand(cmd: RemoteCommand) {
   else if (cmd.type === 'reset' && scrollEl.value) scrollEl.value.scrollTo({ top: 0, behavior: 'smooth' })
   else if (cmd.type === 'scrollUp' && scrollEl.value) scrollEl.value.scrollBy({ top: -120, behavior: 'smooth' })
   else if (cmd.type === 'scrollDown' && scrollEl.value) scrollEl.value.scrollBy({ top: 120, behavior: 'smooth' })
+  else if (cmd.type === 'seek' && scrollEl.value) {
+    const { scrollHeight, clientHeight } = scrollEl.value
+    scrollEl.value.scrollTop = cmd.progress * (scrollHeight - clientHeight)
+  }
 }
 
 const { peerId: remotePeerId, connected: remoteConnected, init: initRemoteHost, broadcastState } =
@@ -257,14 +308,8 @@ let broadcastTimer: ReturnType<typeof setTimeout> | null = null
 watch([playing, speed, fontSize, mirror, focusOpacity], () => {
   if (broadcastTimer) clearTimeout(broadcastTimer)
   broadcastTimer = setTimeout(() => {
-    broadcastState({
-      playing: playing.value,
-      speed: speed.value,
-      fontSize: fontSize.value,
-      mirror: mirror.value,
-      focusOpacity: focusOpacity.value,
-    })
-  }, 50)
+      broadcastState(buildBroadcastState())
+    }, 50)
 })
 
 // ── Session share (share current session state to another device) ─────────────
@@ -493,12 +538,13 @@ function onFramePointerUp() {
   document.removeEventListener('pointerup', onFramePointerUp)
 }
 
-// Restart RAF when speed changes while playing
+// Restart RAF when speed changes while playing; also recalculate timeLeft
 watch(speed, () => {
   if (playing.value) {
     stopScroll()
     startScroll()
   }
+  updateTimelineProgress()
 })
 </script>
 
@@ -546,14 +592,17 @@ watch(speed, () => {
   bottom: 0;
   left: 0;
   right: 0;
-  background: rgba(0, 0, 0, 0.55);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  padding: 0 12px;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.9));
+  padding: 16px 16px 16px;
   transition: opacity 0.3s, transform 0.3s;
   z-index: 20;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
-  height: 48px;
+  pointer-events: none;
+}
+
+.controls :deep(.scroll-timeline) {
+  max-width: 900px;
+  margin: 0 auto 12px;
+  pointer-events: auto;
 }
 
 .controls-hidden .controls {
@@ -568,14 +617,8 @@ watch(speed, () => {
   gap: 4px;
   max-width: 900px;
   margin: 0 auto;
-  height: 100%;
-  flex-wrap: nowrap;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-
-.controls-inner::-webkit-scrollbar {
-  display: none;
+  flex-wrap: wrap;
+  pointer-events: auto;
 }
 
 .ctrl-btn {

@@ -19,6 +19,13 @@
         <div class="connection-badge">● Connected</div>
       </div>
 
+      <!-- Timeline -->
+      <ScrollTimeline
+        :progress="state.scrollProgress"
+        :timeLeft="state.timeLeft"
+        @seek="onRemoteSeek"
+      />
+
       <!-- Play / Pause -->
       <button class="remote-btn play-btn" @click="send({ type: 'togglePlay' })">
         {{ state.playing ? '⏸ Pause' : '▶ Play' }}
@@ -74,6 +81,7 @@
 import { onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useRemoteClient } from '../composables/useRemoteControl'
+import ScrollTimeline from './ScrollTimeline.vue'
 
 const route = useRoute()
 const { state, connected, connecting, error, connect, send } = useRemoteClient()
@@ -81,6 +89,10 @@ const { state, connected, connecting, error, connect, send } = useRemoteClient()
 function retryConnect() {
   const hostId = route.params.peerId as string
   if (hostId) connect(hostId)
+}
+
+function onRemoteSeek(progress: number) {
+  send({ type: 'seek', progress })
 }
 
 onMounted(() => {
@@ -134,6 +146,10 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+
+.remote-controls :deep(.scroll-timeline) {
+  margin-bottom: 4px;
 }
 
 .remote-header {
