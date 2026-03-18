@@ -29,54 +29,58 @@
     <div class="controls" @click.stop>
       <div class="controls-inner">
         <button class="ctrl-btn back-btn" @click="router.push('/')" title="Back">
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
         </button>
-
-        <span class="ctrl-separator" aria-hidden="true"></span>
 
         <button class="ctrl-btn play-btn" @click="togglePlay" :title="playing ? 'Pause' : 'Play'">
-          <svg v-if="!playing" viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M6 4l14 8-14 8V4z"/></svg>
-          <svg v-else viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><rect x="5" y="3" width="4" height="18" rx="1"/><rect x="15" y="3" width="4" height="18" rx="1"/></svg>
+          <svg v-if="!playing" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M6 4l14 8-14 8V4z"/></svg>
+          <svg v-else viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><rect x="5" y="3" width="4" height="18" rx="1"/><rect x="15" y="3" width="4" height="18" rx="1"/></svg>
         </button>
 
         <div class="ctrl-group">
-          <label class="ctrl-label">Speed</label>
-          <input
-            type="range"
-            min="1"
-            max="20"
-            v-model.number="speed"
-            class="ctrl-slider"
-            title="Scroll speed"
-          />
+          <span class="ctrl-label">Speed</span>
           <span class="ctrl-value">{{ speed }}</span>
+          <div class="ctrl-popup">
+            <input
+              type="range"
+              min="1"
+              max="20"
+              v-model.number="speed"
+              class="ctrl-slider"
+              title="Scroll speed"
+            />
+          </div>
         </div>
 
         <div class="ctrl-group">
-          <label class="ctrl-label">Size</label>
-          <input
-            type="range"
-            min="24"
-            max="96"
-            step="4"
-            v-model.number="fontSize"
-            class="ctrl-slider"
-            title="Font size"
-          />
+          <span class="ctrl-label">Size</span>
           <span class="ctrl-value">{{ fontSize }}px</span>
+          <div class="ctrl-popup">
+            <input
+              type="range"
+              min="24"
+              max="96"
+              step="4"
+              v-model.number="fontSize"
+              class="ctrl-slider"
+              title="Font size"
+            />
+          </div>
         </div>
 
         <div class="ctrl-group">
-          <label class="ctrl-label">Focus</label>
-          <input
-            type="range"
-            min="0"
-            max="100"
-            v-model.number="focusOpacity"
-            class="ctrl-slider"
-            title="Focus opacity gradient"
-          />
+          <span class="ctrl-label">Focus</span>
           <span class="ctrl-value">{{ focusOpacity }}%</span>
+          <div class="ctrl-popup">
+            <input
+              type="range"
+              min="0"
+              max="100"
+              v-model.number="focusOpacity"
+              class="ctrl-slider"
+              title="Focus opacity gradient"
+            />
+          </div>
         </div>
 
         <span class="ctrl-separator" aria-hidden="true"></span>
@@ -87,7 +91,7 @@
           @click="editingFrame = !editingFrame"
           title="Edit prompter frame (F)"
         >
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8V4h4"/><path d="M16 4h4v4"/><path d="M20 16v4h-4"/><path d="M8 20H4v-4"/></svg>
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8V4h4"/><path d="M16 4h4v4"/><path d="M20 16v4h-4"/><path d="M8 20H4v-4"/></svg>
         </button>
 
         <button
@@ -96,7 +100,7 @@
           @click="mirror = !mirror"
           title="Mirror mode (M)"
         >
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 16V8l-4 4z"/><path d="M17 8v8l4-4z"/><path d="M12 3v18"/></svg>
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 16V8l-4 4z"/><path d="M17 8v8l4-4z"/><path d="M12 3v18"/></svg>
         </button>
 
         <span class="ctrl-separator" aria-hidden="true"></span>
@@ -108,7 +112,7 @@
           @click="openShareModal"
           title="Remote control"
         >
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
         </button>
 
         <!-- Session share button -->
@@ -117,11 +121,11 @@
           @click="openSessionShare"
           title="Share this session (S)"
         >
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
         </button>
 
         <button class="ctrl-btn icon-btn hide-btn" @click="controlsHidden = !controlsHidden" title="Toggle controls">
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg>
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg>
         </button>
       </div>
     </div>
@@ -539,13 +543,14 @@ watch(speed, () => {
   bottom: 0;
   left: 0;
   right: 0;
-  background: rgba(0, 0, 0, 0.45);
+  background: rgba(0, 0, 0, 0.55);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  padding: 16px 16px 18px;
+  padding: 0 12px;
   transition: opacity 0.3s, transform 0.3s;
   z-index: 20;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
+  height: 48px;
 }
 
 .controls-hidden .controls {
@@ -557,49 +562,56 @@ watch(speed, () => {
 .controls-inner {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 4px;
   max-width: 900px;
   margin: 0 auto;
-  flex-wrap: wrap;
+  height: 100%;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.controls-inner::-webkit-scrollbar {
+  display: none;
 }
 
 .ctrl-btn {
-  background: rgba(255, 255, 255, 0.08);
-  color: rgba(255, 255, 255, 0.9);
-  border-radius: 12px;
-  padding: 12px 16px;
-  font-size: 18px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  transition: background 0.2s, border-color 0.2s;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.8);
+  border-radius: 8px;
+  padding: 8px;
+  font-size: 16px;
+  border: none;
+  transition: background 0.15s, color 0.15s;
   flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   line-height: 1;
+  min-width: 40px;
+  min-height: 40px;
 }
 
 .ctrl-btn:hover {
-  background: rgba(255, 255, 255, 0.16);
-  border-color: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
   opacity: 1;
 }
 
 .ctrl-btn.icon-btn {
-  padding: 12px;
-  min-width: 48px;
-  min-height: 48px;
-  text-align: center;
+  padding: 8px;
+  min-width: 40px;
+  min-height: 40px;
 }
 
 .ctrl-btn.icon-btn.active {
-  background: rgba(74, 222, 128, 0.2);
-  border-color: rgba(74, 222, 128, 0.4);
+  background: rgba(74, 222, 128, 0.15);
   color: var(--accent);
 }
 
 .ctrl-separator {
   width: 1px;
-  height: 28px;
+  height: 24px;
   background: rgba(255, 255, 255, 0.1);
   flex-shrink: 0;
 }
@@ -607,50 +619,88 @@ watch(speed, () => {
 .play-btn {
   background: var(--accent);
   color: #111;
-  border-color: transparent;
   border-radius: 50%;
-  min-width: 56px;
-  min-height: 56px;
+  min-width: 40px;
+  min-height: 40px;
   padding: 0;
 }
 
 .play-btn:hover {
   background: #22c55e;
-  border-color: transparent;
 }
 
+/* Control group: label + value badge, popup slider on hover */
 .ctrl-group {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 12px;
-  border-radius: 10px;
-  transition: background 0.2s;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s;
+  flex-shrink: 0;
+  height: 40px;
 }
 
 .ctrl-group:hover {
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.1);
 }
 
 .ctrl-label {
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.45);
+  color: rgba(255, 255, 255, 0.5);
   white-space: nowrap;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
   font-weight: 600;
+  user-select: none;
+}
+
+.ctrl-value {
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
+  white-space: nowrap;
+  user-select: none;
+}
+
+/* Popup slider panel – appears above the control group on hover */
+.ctrl-popup {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  padding: 12px 16px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  transform: translateX(-50%) translateY(4px);
+  white-space: nowrap;
+}
+
+.ctrl-group:hover .ctrl-popup,
+.ctrl-group:focus-within .ctrl-popup {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(-50%) translateY(0);
 }
 
 .ctrl-slider {
   -webkit-appearance: none;
   appearance: none;
-  width: 100px;
+  width: 120px;
   height: 4px;
-  background: rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.2);
   border-radius: 2px;
   outline: none;
   cursor: pointer;
-  transition: width 0.3s ease, opacity 0.3s ease;
+  display: block;
 }
 
 .ctrl-slider::-webkit-slider-thumb {
@@ -680,35 +730,6 @@ watch(speed, () => {
 
 .ctrl-slider::-moz-range-thumb:hover {
   transform: scale(1.25);
-}
-
-.ctrl-value {
-  font-size: 12px;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.85);
-  min-width: 36px;
-  background: rgba(255, 255, 255, 0.06);
-  padding: 3px 8px;
-  border-radius: 6px;
-  text-align: center;
-}
-
-/* Hide sliders by default on hover-capable devices */
-@media (hover: hover) {
-  .ctrl-slider {
-    width: 0;
-    opacity: 0;
-    overflow: hidden;
-    padding: 0;
-    pointer-events: none;
-  }
-  .ctrl-group:hover .ctrl-slider,
-  .ctrl-group:focus-within .ctrl-slider,
-  .ctrl-slider:focus {
-    width: 100px;
-    opacity: 1;
-    pointer-events: auto;
-  }
 }
 
 .tap-hint {
@@ -927,27 +948,37 @@ watch(speed, () => {
   .tp-content {
     padding: 24px 24px 0;
   }
-  .ctrl-slider {
-    width: 70px;
-  }
   .controls-inner {
-    gap: 8px;
+    gap: 2px;
   }
   .ctrl-btn {
-    padding: 10px 12px;
-    font-size: 16px;
+    min-width: 36px;
+    min-height: 36px;
+    padding: 6px;
   }
   .ctrl-btn.icon-btn {
-    min-width: 44px;
-    min-height: 44px;
-    padding: 10px;
+    min-width: 36px;
+    min-height: 36px;
   }
   .play-btn {
-    min-width: 48px;
-    min-height: 48px;
+    min-width: 36px;
+    min-height: 36px;
   }
   .ctrl-group {
-    padding: 4px 8px;
+    padding: 4px 6px;
+    gap: 3px;
+  }
+  .ctrl-label {
+    font-size: 10px;
+  }
+  .ctrl-value {
+    font-size: 11px;
+  }
+  .ctrl-separator {
+    display: none;
+  }
+  .ctrl-slider {
+    width: 100px;
   }
 }
 </style>
