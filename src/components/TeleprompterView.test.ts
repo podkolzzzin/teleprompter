@@ -381,4 +381,51 @@ describe('TeleprompterView', () => {
     expect(shareBtn.exists()).toBe(true)
     expect(shareBtn.attributes('title')).toBe('Remote control')
   })
+
+  it('renders timeline bar in controls', async () => {
+    vi.mocked(getScript).mockResolvedValue({
+      id: 1,
+      title: 'Test',
+      content: 'Content',
+      createdAt: 1000,
+      updatedAt: 1000,
+    })
+
+    const router = createTestRouter()
+    await router.isReady()
+
+    const wrapper = mount(TeleprompterView, {
+      global: { plugins: [router] },
+    })
+
+    await vi.waitFor(() => {
+      expect(wrapper.find('.loading').exists()).toBe(false)
+    })
+
+    expect(wrapper.find('.tl-bar').exists()).toBe(true)
+    expect(wrapper.find('.tl-fill').exists()).toBe(true)
+  })
+
+  it('timeline starts at 0%', async () => {
+    vi.mocked(getScript).mockResolvedValue({
+      id: 1,
+      title: 'Test',
+      content: 'Content',
+      createdAt: 1000,
+      updatedAt: 1000,
+    })
+
+    const router = createTestRouter()
+    await router.isReady()
+
+    const wrapper = mount(TeleprompterView, {
+      global: { plugins: [router] },
+    })
+
+    await vi.waitFor(() => {
+      expect(wrapper.find('.loading').exists()).toBe(false)
+    })
+
+    expect(wrapper.find('.tl-elapsed').text()).toBe('0%')
+  })
 })

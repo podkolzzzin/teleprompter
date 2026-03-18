@@ -9,6 +9,8 @@ export interface TeleprompterState {
   fontSize: number
   mirror: boolean
   focusOpacity: number
+  scrollProgress: number
+  timeLeft: number
 }
 
 export type RemoteCommand =
@@ -21,6 +23,7 @@ export type RemoteCommand =
   | { type: 'reset' }
   | { type: 'scrollUp' }
   | { type: 'scrollDown' }
+  | { type: 'seek'; progress: number }
 
 // ─── Share / Transfer payload types ──────────────────────────────────────────
 
@@ -96,6 +99,8 @@ export function useRemoteHost(onCommand: (cmd: RemoteCommand) => void) {
       fontSize: state.fontSize,
       mirror: state.mirror,
       focusOpacity: state.focusOpacity,
+      scrollProgress: state.scrollProgress,
+      timeLeft: state.timeLeft,
     }
     for (const conn of connections) {
       if (conn.open) conn.send(msg)
@@ -126,6 +131,8 @@ export function useRemoteClient() {
     fontSize: 48,
     mirror: false,
     focusOpacity: 50,
+    scrollProgress: 0,
+    timeLeft: -1,
   })
   const connected = ref(false)
   const connecting = ref(false)
@@ -155,6 +162,8 @@ export function useRemoteClient() {
             fontSize: msg.fontSize,
             mirror: msg.mirror,
             focusOpacity: msg.focusOpacity,
+            scrollProgress: msg.scrollProgress ?? 0,
+            timeLeft: msg.timeLeft ?? -1,
           }
         }
       })
