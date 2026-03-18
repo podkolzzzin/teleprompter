@@ -26,6 +26,8 @@ test.describe('Teleprompter controls', () => {
   })
 
   test('speed slider changes speed value', async ({ page }) => {
+    // Hover over the control group to reveal the slider (hidden by default on desktop)
+    await page.locator('.ctrl-group').first().hover()
     const speedSlider = page.getByTitle('Scroll speed')
     await expect(speedSlider).toBeVisible()
 
@@ -38,6 +40,8 @@ test.describe('Teleprompter controls', () => {
   })
 
   test('font size slider changes font size value', async ({ page }) => {
+    // Hover over the control group to reveal the slider (hidden by default on desktop)
+    await page.locator('.ctrl-group').nth(1).hover()
     const fontSlider = page.getByTitle('Font size')
     await expect(fontSlider).toBeVisible()
 

@@ -83,12 +83,14 @@ test.describe('Full teleprompter workflow', () => {
     await expect(page.locator('.tp-content')).toContainText('Act One: Opening')
 
     // ── 7. Adjust speed to faster ──
+    await page.locator('.ctrl-group').first().hover()
     const speedSlider = page.getByTitle('Scroll speed')
     await expect(speedSlider).toBeVisible()
     await speedSlider.fill('10')
     await expect(page.locator('.ctrl-group').first().locator('.ctrl-value')).toContainText('10')
 
     // ── 8. Adjust font size larger ──
+    await page.locator('.ctrl-group').nth(1).hover()
     const fontSlider = page.getByTitle('Font size')
     await fontSlider.fill('64')
     await expect(page.locator('.ctrl-group').nth(1).locator('.ctrl-value')).toContainText('64px')
@@ -146,8 +148,10 @@ test.describe('Full teleprompter workflow', () => {
     await expect(page.locator('.tp-root')).not.toHaveClass(/controls-hidden/)
 
     // ── 14. Change speed to slow and font to small, then scroll again ──
+    await page.locator('.ctrl-group').first().hover()
     await speedSlider.fill('3')
     await expect(page.locator('.ctrl-group').first().locator('.ctrl-value')).toContainText('3')
+    await page.locator('.ctrl-group').nth(1).hover()
     await fontSlider.fill('32')
     await expect(page.locator('.ctrl-group').nth(1).locator('.ctrl-value')).toContainText('32px')
 
@@ -224,6 +228,7 @@ test.describe('Full teleprompter workflow', () => {
     await expect(page.locator('.tp-content')).toContainText('Evening Show')
 
     // Play with adjusted speed
+    await page.locator('.ctrl-group').first().hover()
     await page.getByTitle('Scroll speed').fill('12')
     await page.getByTitle('Play').click()
     await page.waitForFunction(() => {

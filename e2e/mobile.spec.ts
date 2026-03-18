@@ -54,6 +54,7 @@ test.describe('Mobile teleprompter workflow', () => {
     await expect(page).toHaveURL(/\/teleprompter\/\d+/)
 
     // The speed slider should be accessible
+    await page.locator('.ctrl-group').first().hover()
     const speedSlider = page.getByTitle('Scroll speed')
     await expect(speedSlider).toBeVisible()
 
@@ -70,6 +71,7 @@ test.describe('Mobile teleprompter workflow', () => {
     await expect(page).toHaveURL(/\/teleprompter\/\d+/)
 
     // The font size slider should be accessible
+    await page.locator('.ctrl-group').nth(1).hover()
     const fontSlider = page.getByTitle('Font size')
     await expect(fontSlider).toBeVisible()
 
@@ -167,9 +169,11 @@ test.describe('Mobile teleprompter workflow', () => {
     await expect(page.locator('.tp-content')).toContainText('Mobile Broadcast')
 
     // ── 3. Increase speed and font size ──
+    await page.locator('.ctrl-group').first().hover()
     await page.getByTitle('Scroll speed').fill('8')
     await expect(page.locator('.ctrl-group').first().locator('.ctrl-value')).toContainText('8')
 
+    await page.locator('.ctrl-group').nth(1).hover()
     await page.getByTitle('Font size').fill('56')
     await expect(page.locator('.ctrl-group').nth(1).locator('.ctrl-value')).toContainText('56px')
 
@@ -215,7 +219,9 @@ test.describe('Mobile teleprompter workflow', () => {
     await expect(page.locator('.tp-root')).not.toHaveClass(/controls-hidden/)
 
     // ── 8. Change settings again and do final scroll ──
+    await page.locator('.ctrl-group').first().hover()
     await page.getByTitle('Scroll speed').fill('15')
+    await page.locator('.ctrl-group').nth(1).hover()
     await page.getByTitle('Font size').fill('40')
     await page.getByTitle('Play').click()
     await page.waitForFunction(() => {
@@ -263,6 +269,7 @@ test.describe('Mobile teleprompter workflow', () => {
     await expect(page.locator('.tp-content')).toContainText('Second Script')
 
     // Play with fast speed
+    await page.locator('.ctrl-group').first().hover()
     await page.getByTitle('Scroll speed').fill('14')
     await page.getByTitle('Play').click()
     await page.waitForFunction(() => {
@@ -279,6 +286,7 @@ test.describe('Mobile teleprompter workflow', () => {
     await expect(page.locator('.tp-content')).toContainText('Welcome to Mobile')
 
     // Play with mirror and large font
+    await page.locator('.ctrl-group').nth(1).hover()
     await page.getByTitle('Font size').fill('72')
     await page.getByTitle('Mirror mode (M)').click()
     await expect(page.locator('.tp-root')).toHaveClass(/mirrored/)
