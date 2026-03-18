@@ -675,6 +675,11 @@ watch(speed, () => {
   background: var(--accent);
   cursor: pointer;
   border: none;
+  transition: transform 0.15s ease;
+}
+
+.ctrl-slider::-moz-range-thumb:hover {
+  transform: scale(1.25);
 }
 
 .ctrl-value {
@@ -698,6 +703,7 @@ watch(speed, () => {
     pointer-events: none;
   }
   .ctrl-group:hover .ctrl-slider,
+  .ctrl-group:focus-within .ctrl-slider,
   .ctrl-slider:focus {
     width: 100px;
     opacity: 1;
