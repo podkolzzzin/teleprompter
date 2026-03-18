@@ -38,10 +38,11 @@
         </button>
 
         <div class="ctrl-group">
-          <span class="ctrl-label">Speed</span>
+          <label class="ctrl-label" for="speed-slider">Speed</label>
           <span class="ctrl-value">{{ speed }}</span>
           <div class="ctrl-popup">
             <input
+              id="speed-slider"
               type="range"
               min="1"
               max="20"
@@ -53,10 +54,11 @@
         </div>
 
         <div class="ctrl-group">
-          <span class="ctrl-label">Size</span>
+          <label class="ctrl-label" for="size-slider">Size</label>
           <span class="ctrl-value">{{ fontSize }}px</span>
           <div class="ctrl-popup">
             <input
+              id="size-slider"
               type="range"
               min="24"
               max="96"
@@ -69,10 +71,11 @@
         </div>
 
         <div class="ctrl-group">
-          <span class="ctrl-label">Focus</span>
+          <label class="ctrl-label" for="focus-slider">Focus</label>
           <span class="ctrl-value">{{ focusOpacity }}%</span>
           <div class="ctrl-popup">
             <input
+              id="focus-slider"
               type="range"
               min="0"
               max="100"
