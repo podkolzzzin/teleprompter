@@ -191,8 +191,10 @@ test.describe('Big E2E test with video proof', () => {
     await expect(page.locator('.tp-content')).toContainText('Act One: The Opening Scene')
 
     // Change speed and font
+    await page.locator('.ctrl-group').first().hover()
     await page.getByTitle('Scroll speed').fill('10')
     await expect(page.locator('.ctrl-group').first().locator('.ctrl-value')).toContainText('10')
+    await page.locator('.ctrl-group').nth(1).hover()
     await page.getByTitle('Font size').fill('64')
     await expect(page.locator('.ctrl-group').nth(1).locator('.ctrl-value')).toContainText('64px')
 
