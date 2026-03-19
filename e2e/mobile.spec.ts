@@ -118,6 +118,45 @@ test.describe('Mobile teleprompter workflow', () => {
     await expect(page.getByTitle('Toggle controls')).toBeVisible()
   })
 
+  test('frame editor boundaries are visible on mobile when opened', async ({ page }) => {
+    await page.getByRole('button', { name: '▶ Start' }).click()
+    await expect(page).toHaveURL(/\/teleprompter\/\d+/)
+
+    // Open frame editor - on mobile the default 900px width exceeds viewport
+    await page.getByTitle('Edit prompter frame (F)').click()
+    await expect(page.locator('.frame-edit-overlay')).toBeVisible()
+
+    // The frame box width must be clamped to viewport width so boundaries are visible
+    const viewportWidth = page.viewportSize()!.width
+    const frameBoxLeft = await page.locator('.frame-box').evaluate((el) => el.getBoundingClientRect().left)
+    const frameBoxRight = await page.locator('.frame-box').evaluate((el) => el.getBoundingClientRect().right)
+
+    // Both edges of the frame should be within the viewport
+    expect(frameBoxLeft).toBeGreaterThanOrEqual(0)
+    expect(frameBoxRight).toBeLessThanOrEqual(viewportWidth)
+
+    // Close frame editor
+    await page.getByTitle('Edit prompter frame (F)').click()
+    await expect(page.locator('.frame-edit-overlay')).not.toBeVisible()
+  })
+
+  test('controls panel stays on a single line on mobile', async ({ page }) => {
+    await page.getByRole('button', { name: '▶ Start' }).click()
+    await expect(page).toHaveURL(/\/teleprompter\/\d+/)
+
+    // All control buttons should fit on a single line (same top offset)
+    const controlsInner = page.locator('.controls-inner')
+    const firstButton = controlsInner.locator('.ctrl-btn').first()
+    const lastButton = controlsInner.locator('.ctrl-btn').last()
+
+    const firstTop = await firstButton.evaluate((el) => el.getBoundingClientRect().top)
+    const lastTop = await lastButton.evaluate((el) => el.getBoundingClientRect().top)
+
+    // All buttons should be on the same row — allow up to 4px tolerance for
+    // sub-pixel rendering differences between the first and last button tops
+    expect(Math.abs(firstTop - lastTop)).toBeLessThan(4)
+  })
+
   test('full mobile workflow: create, edit, preview, teleprompter with all controls, and navigation', async ({ page }) => {
     const consoleErrors: string[] = []
     page.on('console', (msg) => {

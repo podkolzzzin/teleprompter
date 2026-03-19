@@ -94,7 +94,7 @@
         <button
           class="ctrl-btn icon-btn"
           :class="{ active: editingFrame }"
-          @click="editingFrame = !editingFrame"
+          @click="toggleFrameEdit"
           title="Edit prompter frame (F)"
         >
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8V4h4"/><path d="M16 4h4v4"/><path d="M20 16v4h-4"/><path d="M8 20H4v-4"/></svg>
@@ -401,6 +401,7 @@ onUnmounted(() => {
   stopScroll()
   scrollEl.value?.removeEventListener('scroll', onScroll)
   window.removeEventListener('keydown', handleKey)
+  window.removeEventListener('resize', clampFrameToViewport)
   document.removeEventListener('pointermove', onFramePointerMove)
   document.removeEventListener('pointerup', onFramePointerUp)
 })
@@ -472,7 +473,7 @@ function handleKey(e: KeyboardEvent) {
   } else if (e.key === 'h' || e.key === 'H') {
     controlsHidden.value = !controlsHidden.value
   } else if (e.key === 'f' || e.key === 'F') {
-    editingFrame.value = !editingFrame.value
+    toggleFrameEdit()
   } else if (e.key === 's' || e.key === 'S') {
     if (!sessionShareOpen.value) openSessionShare()
   } else if (e.key === 'r' || e.key === 'R') {
@@ -538,6 +539,14 @@ function onFramePointerUp() {
   document.removeEventListener('pointerup', onFramePointerUp)
 }
 
+function toggleFrameEdit() {
+  editingFrame.value = !editingFrame.value
+  if (editingFrame.value && areaWidth.value > window.innerWidth) {
+    areaWidth.value = window.innerWidth
+    areaOffsetX.value = clampOffset(areaOffsetX.value, areaWidth.value)
+  }
+}
+
 // Restart RAF when speed changes while playing; also recalculate timeLeft
 watch(speed, () => {
   if (playing.value) {
@@ -545,6 +554,25 @@ watch(speed, () => {
     startScroll()
   }
   updateTimelineProgress()
+})
+
+// When frame editing starts, clamp frame width to viewport so handles are visible.
+// Also re-clamp on viewport resize (e.g. device rotation) while editing is active.
+function clampFrameToViewport() {
+  const vw = window.innerWidth
+  if (areaWidth.value > vw) {
+    areaWidth.value = vw
+    areaOffsetX.value = clampOffset(areaOffsetX.value, vw)
+  }
+}
+
+watch(editingFrame, (isEditing) => {
+  if (isEditing) {
+    clampFrameToViewport()
+    window.addEventListener('resize', clampFrameToViewport)
+  } else {
+    window.removeEventListener('resize', clampFrameToViewport)
+  }
 })
 </script>
 
@@ -617,8 +645,14 @@ watch(speed, () => {
   gap: 4px;
   max-width: 900px;
   margin: 0 auto;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
   pointer-events: auto;
+}
+
+.controls-inner::-webkit-scrollbar {
+  display: none;
 }
 
 .ctrl-btn {
@@ -1036,6 +1070,23 @@ watch(speed, () => {
   }
   .ctrl-slider {
     width: 100px;
+  }
+  /* Frame boundary visibility on mobile: keep handles inside the frame */
+  .frame-box {
+    border-color: rgba(74, 222, 128, 0.8);
+  }
+  .frame-handle {
+    background: rgba(74, 222, 128, 0.15);
+  }
+  .frame-handle-left {
+    left: 0;
+  }
+  .frame-handle-right {
+    right: 0;
+  }
+  .frame-handle::after {
+    width: 6px;
+    background: rgba(74, 222, 128, 0.9);
   }
 }
 </style>
