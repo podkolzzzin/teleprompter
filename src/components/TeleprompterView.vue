@@ -40,8 +40,8 @@
           <svg v-else viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><rect x="5" y="3" width="4" height="18" rx="1"/><rect x="15" y="3" width="4" height="18" rx="1"/></svg>
         </button>
 
-        <div class="ctrl-group">
-          <label class="ctrl-label" for="speed-slider">Speed</label>
+        <label class="ctrl-group">
+          <span class="ctrl-label">Speed</span>
           <span class="ctrl-value">{{ speed }}</span>
           <div class="ctrl-popup">
             <input
@@ -54,10 +54,10 @@
               title="Scroll speed"
             />
           </div>
-        </div>
+        </label>
 
-        <div class="ctrl-group">
-          <label class="ctrl-label" for="size-slider">Size</label>
+        <label class="ctrl-group">
+          <span class="ctrl-label">Size</span>
           <span class="ctrl-value">{{ fontSize }}px</span>
           <div class="ctrl-popup">
             <input
@@ -71,10 +71,10 @@
               title="Font size"
             />
           </div>
-        </div>
+        </label>
 
-        <div class="ctrl-group">
-          <label class="ctrl-label" for="focus-slider">Focus</label>
+        <label class="ctrl-group">
+          <span class="ctrl-label">Focus</span>
           <span class="ctrl-value">{{ focusOpacity }}%</span>
           <div class="ctrl-popup">
             <input
@@ -87,7 +87,7 @@
               title="Focus opacity gradient"
             />
           </div>
-        </div>
+        </label>
 
         <span class="ctrl-separator" aria-hidden="true"></span>
 
@@ -709,6 +709,17 @@ watch(speed, () => {
   color: rgba(255, 255, 255, 0.9);
   white-space: nowrap;
   user-select: none;
+}
+
+/* Invisible bridge between ctrl-group and popup to prevent hover loss when
+   moving the mouse through the gap between the two elements */
+.ctrl-group::after {
+  content: '';
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  right: 0;
+  height: 8px;
 }
 
 /* Popup slider panel – appears above the control group on hover */
