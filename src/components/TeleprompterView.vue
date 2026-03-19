@@ -401,6 +401,7 @@ onUnmounted(() => {
   stopScroll()
   scrollEl.value?.removeEventListener('scroll', onScroll)
   window.removeEventListener('keydown', handleKey)
+  window.removeEventListener('resize', clampFrameToViewport)
   document.removeEventListener('pointermove', onFramePointerMove)
   document.removeEventListener('pointerup', onFramePointerUp)
 })
@@ -554,6 +555,25 @@ watch(speed, () => {
   }
   updateTimelineProgress()
 })
+
+// When frame editing starts, clamp frame width to viewport so handles are visible.
+// Also re-clamp on viewport resize (e.g. device rotation) while editing is active.
+function clampFrameToViewport() {
+  const vw = window.innerWidth
+  if (areaWidth.value > vw) {
+    areaWidth.value = vw
+    areaOffsetX.value = clampOffset(areaOffsetX.value, vw)
+  }
+}
+
+watch(editingFrame, (isEditing) => {
+  if (isEditing) {
+    clampFrameToViewport()
+    window.addEventListener('resize', clampFrameToViewport)
+  } else {
+    window.removeEventListener('resize', clampFrameToViewport)
+  }
+})
 </script>
 
 <style scoped>
@@ -627,7 +647,12 @@ watch(speed, () => {
   margin: 0 auto;
   flex-wrap: nowrap;
   overflow-x: auto;
+  scrollbar-width: none;
   pointer-events: auto;
+}
+
+.controls-inner::-webkit-scrollbar {
+  display: none;
 }
 
 .ctrl-btn {
@@ -1045,6 +1070,23 @@ watch(speed, () => {
   }
   .ctrl-slider {
     width: 100px;
+  }
+  /* Frame boundary visibility on mobile: keep handles inside the frame */
+  .frame-box {
+    border-color: rgba(74, 222, 128, 0.8);
+  }
+  .frame-handle {
+    background: rgba(74, 222, 128, 0.15);
+  }
+  .frame-handle-left {
+    left: 0;
+  }
+  .frame-handle-right {
+    right: 0;
+  }
+  .frame-handle::after {
+    width: 6px;
+    background: rgba(74, 222, 128, 0.9);
   }
 }
 </style>
