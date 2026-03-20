@@ -98,7 +98,7 @@ Based on findings from [investigate.md](./investigate.md), use the sliding-windo
 ```
 On each SpeechRecognition result:
   1. Normalize heard text → heardWords[]
-  2. Search window: [cursor − 3, cursor + 35]
+  2. Search window: [cursor − 2, cursor + 30]
   3. For each alignment (scriptPos, heardStart):
      - Walk forward, matching words with fuzzy compare
      - Allow up to 3 skips (filler / recognition errors)
@@ -110,7 +110,7 @@ On each SpeechRecognition result:
 ```typescript
 function wordsMatch(a: string, b: string): boolean {
   if (a === b) return true
-  if (a.length < 3 || b.length < 3) return false
+  if (a.length < 4 || b.length < 4) return false
   // Prefix match (tolerates suffix errors)
   const minLen = Math.min(a.length, b.length)
   const prefixLen = Math.max(3, minLen - 1)
@@ -194,7 +194,7 @@ The current teleprompter uses `px/s = speed × 20` where speed is 1–20.
 
 To convert WPM to speed, we need: `speed = WPM × avgWordWidth / (20)` where `avgWordWidth` depends on font size and content width.
 
-More practical approach — **calibration at runtime**:
+A more practical approach — **calibration at runtime**:
 1. Compute `totalWords` in the script.
 2. Compute `totalScrollDistance = scrollHeight − clientHeight` (px).
 3. `pxPerWord = totalScrollDistance / totalWords`.
