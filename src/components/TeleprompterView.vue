@@ -40,7 +40,7 @@
           <svg v-else viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><rect x="5" y="3" width="4" height="18" rx="1"/><rect x="15" y="3" width="4" height="18" rx="1"/></svg>
         </button>
 
-        <label class="ctrl-group">
+        <label class="ctrl-group" @mouseenter="positionPopup" @focusin="positionPopup">
           <span class="ctrl-label">Speed</span>
           <span class="ctrl-value">{{ speed }}</span>
           <div class="ctrl-popup">
@@ -56,7 +56,7 @@
           </div>
         </label>
 
-        <label class="ctrl-group">
+        <label class="ctrl-group" @mouseenter="positionPopup" @focusin="positionPopup">
           <span class="ctrl-label">Size</span>
           <span class="ctrl-value">{{ fontSize }}px</span>
           <div class="ctrl-popup">
@@ -73,7 +73,7 @@
           </div>
         </label>
 
-        <label class="ctrl-group">
+        <label class="ctrl-group" @mouseenter="positionPopup" @focusin="positionPopup">
           <span class="ctrl-label">Focus</span>
           <span class="ctrl-value">{{ focusOpacity }}%</span>
           <div class="ctrl-popup">
@@ -574,6 +574,15 @@ watch(editingFrame, (isEditing) => {
     window.removeEventListener('resize', clampFrameToViewport)
   }
 })
+
+// Position the slider popup using fixed coordinates so it escapes the
+// overflow-x:auto scroll container (.controls-inner).
+function positionPopup(e: Event) {
+  const group = (e.currentTarget as HTMLElement)
+  const rect = group.getBoundingClientRect()
+  group.style.setProperty('--popup-bottom', `${window.innerHeight - rect.top + 8}px`)
+  group.style.setProperty('--popup-left', `${rect.left + rect.width / 2}px`)
+}
 </script>
 
 <style scoped>
@@ -758,9 +767,9 @@ watch(editingFrame, (isEditing) => {
 
 /* Popup slider panel – appears above the control group on hover */
 .ctrl-popup {
-  position: absolute;
-  bottom: calc(100% + 8px);
-  left: 50%;
+  position: fixed;
+  bottom: var(--popup-bottom, 0);
+  left: var(--popup-left, 50%);
   transform: translateX(-50%);
   background: rgba(0, 0, 0, 0.7);
   backdrop-filter: blur(16px);
@@ -773,6 +782,7 @@ watch(editingFrame, (isEditing) => {
   transition: opacity 0.2s ease, transform 0.2s ease;
   transform: translateX(-50%) translateY(4px);
   white-space: nowrap;
+  z-index: 30;
 }
 
 .ctrl-group:hover .ctrl-popup,
