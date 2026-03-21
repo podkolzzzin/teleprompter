@@ -93,8 +93,14 @@ export function matchHeardWords(
         const scriptWord = scriptWords[si].norm
         const heardWord = heardWords[hi]
 
-        if (!heardWord) { hi++; continue }
-        if (!scriptWord) { si++; continue }
+        if (!heardWord) {
+          hi++
+          continue
+        }
+        if (!scriptWord) {
+          si++
+          continue
+        }
 
         if (wordsMatch(scriptWord, heardWord)) {
           matchLen++
@@ -281,13 +287,19 @@ export function useVoiceSync(
     recognition.lang = 'en-US'
     recognition.maxAlternatives = 1
 
-    recognition.onstart = () => { isListening.value = true }
+    recognition.onstart = () => {
+      isListening.value = true
+    }
 
     recognition.onend = () => {
       isListening.value = false
       // Auto-restart if still active
       if (isVoiceSyncActive.value) {
-        try { recognition.start() } catch { /* already running or permission lost */ }
+        try {
+          recognition.start()
+        } catch {
+          // already running or permission lost
+        }
       }
     }
 
@@ -320,7 +332,11 @@ export function useVoiceSync(
 
     if (recognition) {
       recognition.onend = null // prevent auto-restart
-      try { recognition.stop() } catch { /* ignore */ }
+      try {
+        recognition.stop()
+      } catch {
+        // ignore — may already be stopped
+      }
       recognition = null
     }
 

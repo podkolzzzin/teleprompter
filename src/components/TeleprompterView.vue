@@ -413,6 +413,8 @@ function toggleVoiceSync() {
       speed.value = calibrated
     }
   } else {
+    // Stop fixed-speed auto-scroll to avoid competing scroll mechanisms
+    if (playing.value) pauseScroll()
     // Parse current script text (strip HTML tags from rendered markdown)
     const tmp = document.createElement('div')
     tmp.innerHTML = renderedContent.value
@@ -459,10 +461,6 @@ watch(wordCursor, (newIdx) => {
 })
 
 onMounted(async () => {
-  // Load persisted calibrated speed from previous voice sync session
-  const savedSpeed = loadCalibratedSpeed()
-  if (savedSpeed !== null) speed.value = savedSpeed
-
   const id = Number(route.params.id)
   if (id) {
     scriptId.value = id
@@ -478,6 +476,10 @@ onMounted(async () => {
       }
     }
   }
+  // Load persisted calibrated speed from previous voice sync session (after content loaded)
+  const savedSpeed = loadCalibratedSpeed()
+  if (savedSpeed !== null) speed.value = savedSpeed
+
   loading.value = false
   window.addEventListener('keydown', handleKey)
   scrollEl.value?.addEventListener('scroll', onScroll, { passive: true })
