@@ -40,6 +40,16 @@
           <svg v-else viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><rect x="5" y="3" width="4" height="18" rx="1"/><rect x="15" y="3" width="4" height="18" rx="1"/></svg>
         </button>
 
+        <button
+          v-if="voiceSyncSupported"
+          class="ctrl-btn icon-btn mic-btn"
+          :class="{ active: isVoiceSyncActive, listening: voiceSyncListening }"
+          @click="toggleVoiceSync"
+          title="Voice sync (V)"
+        >
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 00-3 3v7a3 3 0 006 0V5a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg>
+        </button>
+
         <label class="ctrl-group" @mouseenter="positionPopup" @focusin="positionPopup">
           <span class="ctrl-label">Speed</span>
           <span class="ctrl-value">{{ speed }}</span>
@@ -137,7 +147,14 @@
     </div>
 
     <!-- Tap hint when playing -->
-    <div v-if="playing && !controlsHidden" class="tap-hint">Tap text to pause</div>
+    <div v-if="playing && !controlsHidden && !isVoiceSyncActive" class="tap-hint">Tap text to pause</div>
+
+    <!-- Voice sync status -->
+    <div v-if="isVoiceSyncActive" class="voice-sync-hint" :class="{ listening: voiceSyncListening }">
+      <span class="voice-sync-dot"></span>
+      {{ voiceSyncListening ? 'Listening…' : 'Starting mic…' }}
+      <span v-if="speakerWPM > 0" class="voice-sync-wpm">{{ speakerWPM }} WPM</span>
+    </div>
 
     <!-- Show controls button when hidden -->
     <button v-if="controlsHidden" class="show-controls-btn" @click.stop="controlsHidden = false">
@@ -179,6 +196,7 @@ import ShareModal from './ShareModal.vue'
 import SessionModal from './SessionModal.vue'
 import ScrollTimeline from './ScrollTimeline.vue'
 import { useRemoteHost, useShareHost, type RemoteCommand } from '../composables/useRemoteControl'
+import { useVoiceSync, loadCalibratedSpeed } from '../composables/useVoiceSync'
 
 const router = useRouter()
 const route = useRoute()
@@ -200,6 +218,25 @@ const scrollEl = ref<HTMLElement | null>(null)
 let rafId: number | null = null
 let lastTime: number | null = null
 const scriptId = ref<number | null>(null)
+
+// ── Voice sync ────────────────────────────────────────────────────────────────
+const {
+  isVoiceSyncActive,
+  isSupported: voiceSyncSupported,
+  isListening: voiceSyncListening,
+  wordCursor,
+  speakerWPM,
+  words: voiceSyncWords,
+  parseScript: voiceSyncParseScript,
+  start: startVoiceSync,
+  stop: stopVoiceSync,
+} = useVoiceSync(() => {
+  if (!scrollEl.value) return null
+  return {
+    scrollHeight: scrollEl.value.scrollHeight,
+    clientHeight: scrollEl.value.clientHeight,
+  }
+})
 
 // ── Auto-save scroll progress ─────────────────────────────────────────────────
 function getScrollProgress(): number {
@@ -368,7 +405,64 @@ const frameBoxStyle = computed(() => ({
   width: `${areaWidth.value}px`,
 }))
 
+// ── Voice sync toggle & scroll driver ─────────────────────────────────────────
+function toggleVoiceSync() {
+  if (isVoiceSyncActive.value) {
+    const calibrated = stopVoiceSync()
+    if (calibrated !== null) {
+      speed.value = calibrated
+    }
+  } else {
+    // Parse current script text (strip HTML tags from rendered markdown)
+    const tmp = document.createElement('div')
+    tmp.innerHTML = renderedContent.value
+    const plainText = tmp.textContent || tmp.innerText || ''
+    voiceSyncParseScript(plainText)
+    // Estimate current word index from scroll progress
+    const progress = getScrollProgress()
+    const fromWord = Math.floor(progress * voiceSyncWords.value.length)
+    startVoiceSync(fromWord)
+  }
+}
+
+// Smooth-scroll to track the current word position
+let voiceSyncTarget = -1
+let voiceSyncRafId: number | null = null
+
+function voiceSyncScrollTick() {
+  if (!scrollEl.value || voiceSyncTarget < 0) {
+    voiceSyncRafId = null
+    return
+  }
+  const current = scrollEl.value.scrollTop
+  const diff = voiceSyncTarget - current
+  if (Math.abs(diff) < 1) {
+    scrollEl.value.scrollTop = voiceSyncTarget
+    voiceSyncRafId = null
+    return
+  }
+  scrollEl.value.scrollTop = current + diff * 0.12
+  voiceSyncRafId = requestAnimationFrame(voiceSyncScrollTick)
+}
+
+watch(wordCursor, (newIdx) => {
+  if (!isVoiceSyncActive.value || !scrollEl.value) return
+  const totalWords = voiceSyncWords.value.length
+  if (totalWords === 0) return
+  // Estimate scroll position from word progress
+  const wordProgress = newIdx / totalWords
+  const maxScroll = scrollEl.value.scrollHeight - scrollEl.value.clientHeight
+  voiceSyncTarget = wordProgress * maxScroll
+  if (voiceSyncRafId === null) {
+    voiceSyncRafId = requestAnimationFrame(voiceSyncScrollTick)
+  }
+})
+
 onMounted(async () => {
+  // Load persisted calibrated speed from previous voice sync session
+  const savedSpeed = loadCalibratedSpeed()
+  if (savedSpeed !== null) speed.value = savedSpeed
+
   const id = Number(route.params.id)
   if (id) {
     scriptId.value = id
@@ -399,6 +493,8 @@ onBeforeUnmount(() => {
 
 onUnmounted(() => {
   stopScroll()
+  if (isVoiceSyncActive.value) stopVoiceSync()
+  if (voiceSyncRafId !== null) cancelAnimationFrame(voiceSyncRafId)
   scrollEl.value?.removeEventListener('scroll', onScroll)
   window.removeEventListener('keydown', handleKey)
   window.removeEventListener('resize', clampFrameToViewport)
@@ -433,7 +529,7 @@ function tick(ts: number) {
   const delta = ts - lastTime
   lastTime = ts
 
-  if (scrollEl.value) {
+  if (scrollEl.value && !isVoiceSyncActive.value) {
     // pixels per second = speed * 20
     const pps = speed.value * 20
     scrollEl.value.scrollTop += (pps * delta) / 1000
@@ -478,6 +574,8 @@ function handleKey(e: KeyboardEvent) {
     if (!sessionShareOpen.value) openSessionShare()
   } else if (e.key === 'r' || e.key === 'R') {
     if (scrollEl.value) scrollEl.value.scrollTop = 0
+  } else if (e.key === 'v' || e.key === 'V') {
+    toggleVoiceSync()
   } else if (e.code === 'Escape') {
     if (editingFrame.value) {
       editingFrame.value = false
@@ -841,6 +939,64 @@ function positionPopup(e: Event) {
   font-size: 13px;
   color: rgba(255, 255, 255, 0.4);
   pointer-events: none;
+}
+
+/* Mic button styles */
+.mic-btn.active {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+}
+
+.mic-btn.listening {
+  animation: mic-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes mic-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.3); }
+  50% { box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); }
+}
+
+/* Voice sync status indicator */
+.voice-sync-hint {
+  position: fixed;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.6);
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  padding: 4px 12px;
+  border-radius: 16px;
+}
+
+.voice-sync-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.4);
+  flex-shrink: 0;
+}
+
+.voice-sync-hint.listening .voice-sync-dot {
+  background: #ef4444;
+  animation: dot-pulse 1s ease-in-out infinite;
+}
+
+@keyframes dot-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.voice-sync-wpm {
+  color: var(--accent);
+  font-weight: 600;
+  margin-left: 4px;
 }
 
 .show-controls-btn {
