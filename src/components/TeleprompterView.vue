@@ -3,6 +3,9 @@
     <!-- Focus gradient overlay -->
     <div class="focus-overlay" :style="{ opacity: focusOpacity / 100 }"></div>
 
+    <!-- Voice sync word highlight band -->
+    <div v-if="isVoiceSyncActive" class="voice-sync-highlight" :style="voiceSyncHighlightStyle" aria-hidden="true"></div>
+
     <!-- Frame edit overlay -->
     <div v-if="editingFrame" class="frame-edit-overlay">
       <div class="frame-box" :style="frameBoxStyle">
@@ -409,6 +412,7 @@ const frameBoxStyle = computed(() => ({
 function toggleVoiceSync() {
   if (isVoiceSyncActive.value) {
     const calibrated = stopVoiceSync()
+    wordScrollPositions = []
     if (calibrated !== null) {
       speed.value = calibrated
     }
@@ -424,12 +428,48 @@ function toggleVoiceSync() {
     const progress = getScrollProgress()
     const fromWord = Math.floor(progress * voiceSyncWords.value.length)
     startVoiceSync(fromWord)
+    // Build DOM-based word position index for accurate scroll-to-center
+    buildWordPositionIndex()
   }
 }
 
 // Smooth-scroll to track the current word position
 let voiceSyncTarget = -1
 let voiceSyncRafId: number | null = null
+
+// DOM-based word position index for accurate scroll-to-center
+let wordScrollPositions: number[] = []
+
+function buildWordPositionIndex(): void {
+  wordScrollPositions = []
+  if (!scrollEl.value) return
+  const contentEl = scrollEl.value.querySelector('.tp-content') as HTMLElement | null
+  if (!contentEl) return
+  const scrollTop = scrollEl.value.scrollTop
+  const containerTop = scrollEl.value.getBoundingClientRect().top
+  const walker = document.createTreeWalker(contentEl, NodeFilter.SHOW_TEXT, null)
+  const wordRegex = /\S+/g
+  while (walker.nextNode()) {
+    if (wordScrollPositions.length >= voiceSyncWords.value.length) break
+    const node = walker.currentNode as Text
+    const text = node.textContent || ''
+    wordRegex.lastIndex = 0
+    let match: RegExpExecArray | null
+    while ((match = wordRegex.exec(text)) !== null) {
+      if (wordScrollPositions.length >= voiceSyncWords.value.length) break
+      const range = document.createRange()
+      range.setStart(node, match.index)
+      range.setEnd(node, match.index + match[0].length)
+      const rect = range.getBoundingClientRect()
+      // Convert viewport-relative top to scroll-container-absolute top
+      wordScrollPositions.push(scrollTop + rect.top - containerTop)
+    }
+  }
+}
+
+const voiceSyncHighlightStyle = computed(() => ({
+  height: `${Math.round(fontSize.value * 1.5)}px`,
+}))
 
 function voiceSyncScrollTick() {
   if (!scrollEl.value || voiceSyncTarget < 0) {
@@ -451,10 +491,18 @@ watch(wordCursor, (newIdx) => {
   if (!isVoiceSyncActive.value || !scrollEl.value) return
   const totalWords = voiceSyncWords.value.length
   if (totalWords === 0) return
-  // Estimate scroll position from word progress
-  const wordProgress = newIdx / totalWords
+  const clientHeight = scrollEl.value.clientHeight
   const maxScroll = scrollEl.value.scrollHeight - scrollEl.value.clientHeight
-  voiceSyncTarget = wordProgress * maxScroll
+  let targetScrollTop: number
+  if (newIdx < wordScrollPositions.length) {
+    // Center the recognized word in the viewport using its exact DOM position
+    targetScrollTop = wordScrollPositions[newIdx] - clientHeight / 2
+  } else {
+    // Fallback: linear interpolation by word progress
+    const wordProgress = newIdx / totalWords
+    targetScrollTop = wordProgress * maxScroll
+  }
+  voiceSyncTarget = Math.max(0, Math.min(targetScrollTop, maxScroll))
   if (voiceSyncRafId === null) {
     voiceSyncRafId = requestAnimationFrame(voiceSyncScrollTick)
   }
@@ -999,6 +1047,28 @@ function positionPopup(e: Event) {
   color: var(--accent);
   font-weight: 600;
   margin-left: 4px;
+}
+
+/* Voice sync word highlight band – marks the center reading zone */
+.voice-sync-highlight {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    rgba(74, 222, 128, 0.07) 30%,
+    rgba(74, 222, 128, 0.1) 50%,
+    rgba(74, 222, 128, 0.07) 70%,
+    transparent
+  );
+  border-top: 1px solid rgba(74, 222, 128, 0.18);
+  border-bottom: 1px solid rgba(74, 222, 128, 0.18);
+  pointer-events: none;
+  z-index: 11;
+  transition: height 0.2s ease;
 }
 
 .show-controls-btn {
