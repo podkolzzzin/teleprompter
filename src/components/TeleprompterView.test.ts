@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createRouter, createWebHistory } from 'vue-router'
 import TeleprompterView from './TeleprompterView.vue'
@@ -6,6 +6,7 @@ import TeleprompterView from './TeleprompterView.vue'
 // Mock the storage module
 vi.mock('../storage/db', () => ({
   getScript: vi.fn(),
+  updateScrollProgress: vi.fn(),
 }))
 
 // Mock peerjs to avoid network calls in tests
@@ -38,12 +39,22 @@ function createTestRouter(id = 1) {
 }
 
 describe('TeleprompterView', () => {
+  const originalWakeLockDescriptor = Object.getOwnPropertyDescriptor(navigator, 'wakeLock')
+
   beforeEach(() => {
     vi.clearAllMocks()
     // Mock requestAnimationFrame for scrolling tests
     vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => {
       return window.setTimeout(() => cb(performance.now()), 0)
     })
+  })
+
+  afterEach(() => {
+    if (originalWakeLockDescriptor) {
+      Object.defineProperty(navigator, 'wakeLock', originalWakeLockDescriptor)
+    } else {
+      Reflect.deleteProperty(navigator, 'wakeLock')
+    }
   })
 
   it('renders script content', async () => {
@@ -108,6 +119,79 @@ describe('TeleprompterView', () => {
     expect(playBtn.attributes('title')).toBe('Play')
   })
 
+  it('keeps the screen awake only while playing', async () => {
+    vi.mocked(getScript).mockResolvedValue({
+      id: 1,
+      title: 'Test',
+      content: 'Content',
+      createdAt: 1000,
+      updatedAt: 1000,
+    })
+
+    const release = vi.fn().mockResolvedValue(undefined)
+    const sentinel = new EventTarget() as WakeLockSentinel
+    Object.defineProperties(sentinel, {
+      released: { get: () => false },
+      release: { value: release },
+      type: { value: 'screen' },
+    })
+    const request = vi.fn().mockResolvedValue(sentinel)
+    Object.defineProperty(navigator, 'wakeLock', {
+      configurable: true,
+      value: { request },
+    })
+
+    vi.mocked(window.requestAnimationFrame).mockImplementation(() => 1)
+
+    const router = createTestRouter()
+    await router.isReady()
+
+    const wrapper = mount(TeleprompterView, {
+      global: { plugins: [router] },
+    })
+
+    await vi.waitFor(() => {
+      expect(wrapper.find('.loading').exists()).toBe(false)
+    })
+
+    await wrapper.find('.play-btn').trigger('click')
+    await vi.waitFor(() => {
+      expect(request).toHaveBeenCalledWith('screen')
+    })
+
+    await wrapper.find('.play-btn').trigger('click')
+    await vi.waitFor(() => {
+      expect(release).toHaveBeenCalledOnce()
+    })
+
+    wrapper.unmount()
+  })
+
+  it('adds space before the first line of text', async () => {
+    vi.mocked(getScript).mockResolvedValue({
+      id: 1,
+      title: 'Test',
+      content: 'First line',
+      createdAt: 1000,
+      updatedAt: 1000,
+    })
+
+    const router = createTestRouter()
+    await router.isReady()
+
+    const wrapper = mount(TeleprompterView, {
+      global: { plugins: [router] },
+    })
+
+    await vi.waitFor(() => {
+      expect(wrapper.find('.loading').exists()).toBe(false)
+    })
+
+    const scrollChildren = wrapper.find('.tp-scroll').element.children
+    expect(scrollChildren[0]?.classList.contains('tp-start-spacer')).toBe(true)
+    expect(scrollChildren[1]?.classList.contains('tp-content')).toBe(true)
+  })
+
   it('toggles mirror mode', async () => {
     vi.mocked(getScript).mockResolvedValue({
       id: 1,
@@ -135,6 +219,68 @@ describe('TeleprompterView', () => {
 
     await wrapper.find('[title="Mirror mode (M)"]').trigger('click')
     expect(wrapper.find('.tp-root').classes()).not.toContain('mirrored')
+  })
+
+  it('toggles vertical flip mode', async () => {
+    vi.mocked(getScript).mockResolvedValue({
+      id: 1,
+      title: 'Test',
+      content: 'Content',
+      createdAt: 1000,
+      updatedAt: 1000,
+    })
+
+    const router = createTestRouter()
+    await router.isReady()
+
+    const wrapper = mount(TeleprompterView, {
+      global: { plugins: [router] },
+    })
+
+    await vi.waitFor(() => {
+      expect(wrapper.find('.loading').exists()).toBe(false)
+    })
+
+    const root = wrapper.find('.tp-root')
+    const flipButton = wrapper.find('.flip-vertical-btn')
+
+    expect(root.classes()).not.toContain('flipped-vertically')
+    expect(flipButton.classes()).not.toContain('active')
+
+    await flipButton.trigger('click')
+    expect(root.classes()).toContain('flipped-vertically')
+    expect(flipButton.classes()).toContain('active')
+
+    await flipButton.trigger('click')
+    expect(root.classes()).not.toContain('flipped-vertically')
+  })
+
+  it('combines mirror and vertical flip modes', async () => {
+    vi.mocked(getScript).mockResolvedValue({
+      id: 1,
+      title: 'Test',
+      content: 'Content',
+      createdAt: 1000,
+      updatedAt: 1000,
+    })
+
+    const router = createTestRouter()
+    await router.isReady()
+
+    const wrapper = mount(TeleprompterView, {
+      global: { plugins: [router] },
+    })
+
+    await vi.waitFor(() => {
+      expect(wrapper.find('.loading').exists()).toBe(false)
+    })
+
+    await wrapper.find('[title="Mirror mode (M)"]').trigger('click')
+    await wrapper.find('.flip-vertical-btn').trigger('click')
+
+    expect(wrapper.find('.tp-root').classes()).toEqual(
+      expect.arrayContaining(['mirrored', 'flipped-vertically'])
+    )
   })
 
   it('toggles controls visibility', async () => {

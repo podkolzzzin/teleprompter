@@ -1,5 +1,12 @@
 <template>
-  <div class="tp-root" :class="{ mirrored: mirror, 'controls-hidden': controlsHidden }">
+  <div
+    class="tp-root"
+    :class="{
+      mirrored: mirror,
+      'flipped-vertically': flipVertically,
+      'controls-hidden': controlsHidden,
+    }"
+  >
     <!-- Focus gradient overlay -->
     <div class="focus-overlay" :style="{ opacity: focusOpacity / 100 }"></div>
 
@@ -24,6 +31,7 @@
       :style="{ fontSize: fontSize + 'px' }"
       @click="onScrollClick"
     >
+      <div class="tp-start-spacer"></div>
       <div class="tp-content prose" :style="contentAreaStyle" v-html="renderedContent"></div>
       <div class="tp-spacer"></div>
     </div>
@@ -122,6 +130,15 @@
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 16V8l-4 4z"/><path d="M17 8v8l4-4z"/><path d="M12 3v18"/></svg>
         </button>
 
+        <button
+          class="ctrl-btn icon-btn flip-vertical-btn"
+          :class="{ active: flipVertically }"
+          @click="flipVertically = !flipVertically"
+          title="Flip vertically"
+        >
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 7h8l-4-4z"/><path d="M16 17H8l4 4z"/><path d="M3 12h18"/></svg>
+        </button>
+
         <span class="ctrl-separator" aria-hidden="true"></span>
 
         <!-- Remote control share button -->
@@ -200,6 +217,7 @@ import SessionModal from './SessionModal.vue'
 import ScrollTimeline from './ScrollTimeline.vue'
 import { useRemoteHost, useShareHost, type RemoteCommand } from '../composables/useRemoteControl'
 import { useVoiceSync, loadCalibratedSpeed } from '../composables/useVoiceSync'
+import { useWakeLock } from '../composables/useWakeLock'
 
 const router = useRouter()
 const route = useRoute()
@@ -211,11 +229,14 @@ const speed = ref(5)
 const fontSize = ref(48)
 const mirror = ref(false)
 const focusOpacity = ref(50)
+const flipVertically = ref(false)
 const controlsHidden = ref(false)
 const editingFrame = ref(false)
 const areaWidth = ref(900)
 const areaOffsetX = ref(0)
 const showShareModal = ref(false)
+
+useWakeLock(playing)
 
 const scrollEl = ref<HTMLElement | null>(null)
 let rafId: number | null = null
@@ -748,6 +769,14 @@ function positionPopup(e: Event) {
   transform: scaleX(-1);
 }
 
+.tp-root.flipped-vertically .tp-scroll {
+  transform: scaleY(-1);
+}
+
+.tp-root.mirrored.flipped-vertically .tp-scroll {
+  transform: scale(-1, -1);
+}
+
 .tp-scroll {
   flex: 1;
   overflow-y: auto;
@@ -758,6 +787,10 @@ function positionPopup(e: Event) {
 
 .tp-scroll::-webkit-scrollbar {
   display: none;
+}
+
+.tp-start-spacer {
+  height: 50vh;
 }
 
 .tp-content {

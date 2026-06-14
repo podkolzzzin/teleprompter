@@ -1,6 +1,6 @@
 # 📺 Teleprompter
 
-A Progressive Web App (PWA) teleprompter for reading scripts in the browser. Supports auto-scrolling, adjustable speed and font size, mirror mode, remote control, file import, and offline use.
+A Progressive Web App (PWA) teleprompter for reading scripts in the browser. Supports auto-scrolling, adjustable speed and font size, horizontal mirroring, vertical flipping, screen wake lock during playback, remote control, file import, and offline use.
 
 ## Screenshots
 
@@ -13,6 +13,8 @@ A Progressive Web App (PWA) teleprompter for reading scripts in the browser. Sup
 - 📝 **Markdown Editor** — Create and edit scripts with live preview
 - 📺 **Auto-Scroll Display** — Full-screen teleprompter with adjustable speed (1–20) and font size (24–96 px)
 - 🪞 **Mirror Mode** — Horizontal flip for use with physical teleprompter glass
+- ↕️ **Vertical Flip** — Flip the script vertically for flexible display setups
+- 🔆 **Screen Wake Lock** — Keep supported mobile screens awake during playback
 - 🖼️ **Frame Editor** — Drag and resize the content area to fit any physical prompter setup
 - 📲 **Remote Control** — Share a link or QR code so a second device can control playback via WebRTC (PeerJS)
 - 📤 **Session Share** — Share the current teleprompter session (content, settings, scroll position) to another device
