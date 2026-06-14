@@ -142,10 +142,10 @@ describe('matchHeardWords', () => {
 // ─── calibrateSpeed ───────────────────────────────────────────────────────────
 
 describe('calibrateSpeed', () => {
-  it('returns a speed between 1 and 20', () => {
+  it('returns a speed between 1 and 30', () => {
     const speed = calibrateSpeed(150, 300, 6000)
     expect(speed).toBeGreaterThanOrEqual(1)
-    expect(speed).toBeLessThanOrEqual(20)
+    expect(speed).toBeLessThanOrEqual(30)
   })
 
   it('returns null for invalid inputs', () => {
@@ -166,7 +166,7 @@ describe('calibrateSpeed', () => {
     expect(low).toBe(1)
     // Very high WPM with lots of scroll distance
     const high = calibrateSpeed(300, 10, 100000)
-    expect(high).toBe(20)
+    expect(high).toBe(30)
   })
 })
 
@@ -187,7 +187,7 @@ describe('loadCalibratedSpeed / saveCalibratedSpeed', () => {
   })
 
   it('returns null for out-of-range values', () => {
-    localStorage.setItem('voice-sync-calibrated-speed', '25')
+    localStorage.setItem('voice-sync-calibrated-speed', '31')
     expect(loadCalibratedSpeed()).toBeNull()
     localStorage.setItem('voice-sync-calibrated-speed', '0')
     expect(loadCalibratedSpeed()).toBeNull()
@@ -308,7 +308,7 @@ describe('useVoiceSync', () => {
       const speed = stop()
       // Without enough elapsed time, calibration may not produce a result
       // That's OK — we just verify it doesn't crash
-      expect(speed === null || (speed >= 1 && speed <= 20)).toBe(true)
+      expect(speed === null || (speed >= 1 && speed <= 30)).toBe(true)
     })
 
     it('sets isListening on start/end events', () => {

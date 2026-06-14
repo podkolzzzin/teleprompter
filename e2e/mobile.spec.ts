@@ -54,16 +54,16 @@ test.describe('Mobile teleprompter workflow', () => {
     await expect(page).toHaveURL(/\/teleprompter\/\d+/)
 
     // The speed slider should be accessible
-    await page.locator('.ctrl-group').first().hover()
+    await page.locator('.speed-control').tap()
     const speedSlider = page.getByTitle('Scroll speed')
     await expect(speedSlider).toBeVisible()
 
-    // Change speed via keyboard
-    await speedSlider.focus()
-    await speedSlider.fill('15')
+    // Change speed precisely using the larger numeric control
+    await page.getByLabel('Speed value').fill('27')
+    await page.getByLabel('Speed value').press('Enter')
 
     // Verify the speed value updated
-    await expect(page.getByText('15').first()).toBeVisible()
+    await expect(page.locator('.ctrl-group').first().locator('.ctrl-value')).toContainText('27')
   })
 
   test('adjusts font size control on mobile', async ({ page }) => {

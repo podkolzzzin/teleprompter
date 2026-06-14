@@ -35,8 +35,15 @@ test.describe('Teleprompter controls', () => {
     await expect(page.locator('.ctrl-group').first().locator('.ctrl-value')).toContainText('5')
 
     // Change speed
-    await speedSlider.fill('12')
-    await expect(page.locator('.ctrl-group').first().locator('.ctrl-value')).toContainText('12')
+    await speedSlider.fill('30')
+    await expect(page.locator('.ctrl-group').first().locator('.ctrl-value')).toContainText('30')
+
+    await page.getByLabel('Decrease speed').click()
+    await expect(page.locator('.ctrl-group').first().locator('.ctrl-value')).toContainText('29')
+
+    await page.getByLabel('Speed value').fill('17')
+    await page.getByLabel('Speed value').press('Enter')
+    await expect(page.locator('.ctrl-group').first().locator('.ctrl-value')).toContainText('17')
   })
 
   test('font size slider changes font size value', async ({ page }) => {

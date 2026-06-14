@@ -11,7 +11,7 @@ A Progressive Web App (PWA) teleprompter for reading scripts in the browser. Sup
 ## Features
 
 - 📝 **Markdown Editor** — Create and edit scripts with live preview
-- 📺 **Auto-Scroll Display** — Full-screen teleprompter with adjustable speed (1–20) and font size (24–96 px)
+- 📺 **Auto-Scroll Display** — Full-screen teleprompter with adjustable speed (1–30) and font size (24–96 px)
 - 🪞 **Mirror Mode** — Horizontal flip for use with physical teleprompter glass
 - ↕️ **Vertical Flip** — Flip the script vertically for flexible display setups
 - 🔆 **Screen Wake Lock** — Keep supported mobile screens awake during playback

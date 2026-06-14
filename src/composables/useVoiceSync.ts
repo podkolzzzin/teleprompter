@@ -1,4 +1,9 @@
 import { ref, type Ref } from 'vue'
+import {
+  MAX_SCROLL_SPEED,
+  MIN_SCROLL_SPEED,
+  clampScrollSpeed,
+} from '../constants/teleprompter'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -25,7 +30,7 @@ export interface UseVoiceSyncReturn {
   parseScript: (text: string) => void
   /** Start voice tracking (optionally from a specific word index) */
   start: (fromWordIndex?: number) => void
-  /** Stop voice tracking and return calibrated speed (1–20), or null if insufficient data */
+  /** Stop voice tracking and return calibrated speed (1–30), or null if insufficient data */
   stop: () => number | null
 }
 
@@ -160,7 +165,7 @@ export function matchHeardWords(
 }
 
 /**
- * Calculate calibrated speed (1–20) from WPM + scroll geometry.
+ * Calculate calibrated speed (1–30) from WPM + scroll geometry.
  * Returns null if WPM is 0 or geometry is unavailable.
  */
 export function calibrateSpeed(
@@ -172,20 +177,20 @@ export function calibrateSpeed(
   const pxPerWord = totalScrollDistance / totalWords
   const requiredPPS = (wpm / 60) * pxPerWord
   const calibrated = Math.round(requiredPPS / 20)
-  return Math.max(1, Math.min(20, calibrated))
+  return clampScrollSpeed(calibrated)
 }
 
 // ─── localStorage key ─────────────────────────────────────────────────────────
 
 const CALIBRATED_SPEED_KEY = 'voice-sync-calibrated-speed'
 
-/** Read persisted calibrated speed (1–20), or null if none saved */
+/** Read persisted calibrated speed (1–30), or null if none saved */
 export function loadCalibratedSpeed(): number | null {
   try {
     const raw = localStorage.getItem(CALIBRATED_SPEED_KEY)
     if (!raw) return null
     const n = Number(raw)
-    return n >= 1 && n <= 20 ? n : null
+    return n >= MIN_SCROLL_SPEED && n <= MAX_SCROLL_SPEED ? n : null
   } catch {
     return null
   }

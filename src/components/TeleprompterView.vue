@@ -61,21 +61,62 @@
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 00-3 3v7a3 3 0 006 0V5a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg>
         </button>
 
-        <label class="ctrl-group" @mouseenter="positionPopup" @focusin="positionPopup">
+        <div
+          class="ctrl-group speed-control"
+          tabindex="0"
+          @mouseenter="positionPopup"
+          @focusin="positionPopup"
+        >
           <span class="ctrl-label">Speed</span>
           <span class="ctrl-value">{{ speed }}</span>
-          <div class="ctrl-popup">
+          <div class="ctrl-popup speed-popup">
+            <div class="speed-popup-header">
+              <span>Scroll speed</span>
+              <span class="speed-range">{{ MIN_SCROLL_SPEED }}–{{ MAX_SCROLL_SPEED }}</span>
+            </div>
             <input
               id="speed-slider"
               type="range"
-              min="1"
-              max="20"
+              :min="MIN_SCROLL_SPEED"
+              :max="MAX_SCROLL_SPEED"
+              step="1"
               v-model.number="speed"
-              class="ctrl-slider"
+              class="ctrl-slider speed-slider"
               title="Scroll speed"
             />
+            <div class="speed-stepper">
+              <button
+                type="button"
+                class="speed-step-btn"
+                :disabled="speed <= MIN_SCROLL_SPEED"
+                aria-label="Decrease speed"
+                @click="changeSpeed(-1)"
+              >
+                −
+              </button>
+              <input
+                type="number"
+                class="speed-number"
+                :min="MIN_SCROLL_SPEED"
+                :max="MAX_SCROLL_SPEED"
+                step="1"
+                :value="speed"
+                aria-label="Speed value"
+                inputmode="numeric"
+                @change="setSpeedFromInput"
+              />
+              <button
+                type="button"
+                class="speed-step-btn"
+                :disabled="speed >= MAX_SCROLL_SPEED"
+                aria-label="Increase speed"
+                @click="changeSpeed(1)"
+              >
+                +
+              </button>
+            </div>
           </div>
-        </label>
+        </div>
 
         <label class="ctrl-group" @mouseenter="positionPopup" @focusin="positionPopup">
           <span class="ctrl-label">Size</span>
@@ -218,6 +259,11 @@ import ScrollTimeline from './ScrollTimeline.vue'
 import { useRemoteHost, useShareHost, type RemoteCommand } from '../composables/useRemoteControl'
 import { useVoiceSync, loadCalibratedSpeed } from '../composables/useVoiceSync'
 import { useWakeLock } from '../composables/useWakeLock'
+import {
+  MAX_SCROLL_SPEED,
+  MIN_SCROLL_SPEED,
+  clampScrollSpeed,
+} from '../constants/teleprompter'
 
 const router = useRouter()
 const route = useRoute()
@@ -332,8 +378,8 @@ function maybeScrollBroadcast() {
 // ── Remote control (smartphone controls the teleprompter) ─────────────────────
 function handleRemoteCommand(cmd: RemoteCommand) {
   if (cmd.type === 'togglePlay') togglePlay()
-  else if (cmd.type === 'speedUp') speed.value = Math.min(20, speed.value + 1)
-  else if (cmd.type === 'speedDown') speed.value = Math.max(1, speed.value - 1)
+  else if (cmd.type === 'speedUp') changeSpeed(1)
+  else if (cmd.type === 'speedDown') changeSpeed(-1)
   else if (cmd.type === 'fontUp') fontSize.value = Math.min(96, fontSize.value + 4)
   else if (cmd.type === 'fontDown') fontSize.value = Math.max(24, fontSize.value - 4)
   else if (cmd.type === 'toggleMirror') mirror.value = !mirror.value
@@ -344,6 +390,18 @@ function handleRemoteCommand(cmd: RemoteCommand) {
     const { scrollHeight, clientHeight } = scrollEl.value
     scrollEl.value.scrollTop = cmd.progress * (scrollHeight - clientHeight)
   }
+}
+
+function changeSpeed(delta: number) {
+  speed.value = clampScrollSpeed(speed.value + delta)
+}
+
+function setSpeedFromInput(event: Event) {
+  const input = event.currentTarget as HTMLInputElement
+  if (Number.isFinite(input.valueAsNumber)) {
+    speed.value = clampScrollSpeed(input.valueAsNumber)
+  }
+  input.value = String(speed.value)
 }
 
 const { peerId: remotePeerId, connected: remoteConnected, init: initRemoteHost, broadcastState } =
@@ -625,10 +683,10 @@ function handleKey(e: KeyboardEvent) {
     togglePlay()
   } else if (e.code === 'ArrowUp') {
     e.preventDefault()
-    speed.value = Math.min(20, speed.value + 1)
+    changeSpeed(1)
   } else if (e.code === 'ArrowDown') {
     e.preventDefault()
-    speed.value = Math.max(1, speed.value - 1)
+    changeSpeed(-1)
   } else if (e.code === 'ArrowLeft') {
     e.preventDefault()
     fontSize.value = Math.max(24, fontSize.value - 4)
@@ -749,8 +807,15 @@ watch(editingFrame, (isEditing) => {
 function positionPopup(e: Event) {
   const group = (e.currentTarget as HTMLElement)
   const rect = group.getBoundingClientRect()
+  const popup = group.querySelector<HTMLElement>('.ctrl-popup')
+  const popupWidth = popup?.offsetWidth ?? 0
+  const halfWidth = popupWidth / 2
+  const desiredLeft = rect.left + rect.width / 2
+  const popupLeft = popupWidth > 0
+    ? clamp(desiredLeft, halfWidth + 12, window.innerWidth - halfWidth - 12)
+    : desiredLeft
   group.style.setProperty('--popup-bottom', `${window.innerHeight - rect.top + 8}px`)
-  group.style.setProperty('--popup-left', `${rect.left + rect.width / 2}px`)
+  group.style.setProperty('--popup-left', `${popupLeft}px`)
 }
 </script>
 
@@ -913,6 +978,10 @@ function positionPopup(e: Event) {
   height: 40px;
 }
 
+.ctrl-group:focus {
+  outline: none;
+}
+
 .ctrl-group:hover {
   background: rgba(255, 255, 255, 0.1);
 }
@@ -1012,6 +1081,90 @@ function positionPopup(e: Event) {
 
 .ctrl-slider::-moz-range-thumb:hover {
   transform: scale(1.25);
+}
+
+.speed-popup {
+  width: min(360px, calc(100vw - 24px));
+  padding: 16px;
+}
+
+.speed-popup-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.speed-range {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 12px;
+}
+
+.speed-slider {
+  width: 100%;
+  height: 8px;
+  border-radius: 4px;
+}
+
+.speed-slider::-webkit-slider-thumb {
+  width: 28px;
+  height: 28px;
+}
+
+.speed-slider::-moz-range-thumb {
+  width: 28px;
+  height: 28px;
+}
+
+.speed-stepper {
+  display: grid;
+  grid-template-columns: 52px minmax(80px, 1fr) 52px;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.speed-step-btn,
+.speed-number {
+  min-height: 48px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+.speed-step-btn {
+  padding: 0;
+  font-size: 26px;
+  line-height: 1;
+}
+
+.speed-step-btn:disabled {
+  cursor: default;
+  opacity: 0.35;
+}
+
+.speed-number {
+  width: 100%;
+  padding: 0 8px;
+  font-size: 22px;
+  font-weight: 700;
+  text-align: center;
+  outline: none;
+  appearance: textfield;
+}
+
+.speed-number:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(74, 222, 128, 0.15);
+}
+
+.speed-number::-webkit-inner-spin-button,
+.speed-number::-webkit-outer-spin-button {
+  margin: 0;
+  appearance: none;
 }
 
 .tap-hint {
@@ -1341,6 +1494,26 @@ function positionPopup(e: Event) {
   }
   .ctrl-slider {
     width: 100px;
+  }
+  .speed-control {
+    min-width: 72px;
+    justify-content: center;
+  }
+  .speed-popup {
+    width: calc(100vw - 24px);
+    padding: 18px;
+  }
+  .speed-slider {
+    width: 100%;
+    height: 10px;
+  }
+  .speed-slider::-webkit-slider-thumb {
+    width: 32px;
+    height: 32px;
+  }
+  .speed-slider::-moz-range-thumb {
+    width: 32px;
+    height: 32px;
   }
   /* Frame boundary visibility on mobile: keep handles inside the frame */
   .frame-box {
