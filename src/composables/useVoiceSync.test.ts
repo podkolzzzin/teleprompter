@@ -160,6 +160,11 @@ describe('calibrateSpeed', () => {
     expect(fast).toBeGreaterThanOrEqual(slow)
   })
 
+  it('returns fractional speed values', () => {
+    expect(calibrateSpeed(150, 100, 1000)).toBe(1.25)
+    expect(calibrateSpeed(150, 100, 2000)).toBe(2.5)
+  })
+
   it('clamps to bounds', () => {
     // Very low WPM
     const low = calibrateSpeed(1, 1000, 100)
@@ -182,8 +187,8 @@ describe('loadCalibratedSpeed / saveCalibratedSpeed', () => {
   })
 
   it('saves and loads a valid speed', () => {
-    saveCalibratedSpeed(7)
-    expect(loadCalibratedSpeed()).toBe(7)
+    saveCalibratedSpeed(7.4)
+    expect(loadCalibratedSpeed()).toBe(7.4)
   })
 
   it('returns null for out-of-range values', () => {

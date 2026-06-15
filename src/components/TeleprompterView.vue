@@ -5,6 +5,7 @@
       mirrored: mirror,
       'flipped-vertically': flipVertically,
       'controls-hidden': controlsHidden,
+      [orientationClass]: orientationClass,
     }"
   >
     <!-- Focus gradient overlay -->
@@ -79,7 +80,7 @@
               type="range"
               :min="MIN_SCROLL_SPEED"
               :max="MAX_SCROLL_SPEED"
-              step="1"
+              :step="SCROLL_SPEED_STEP"
               v-model.number="speed"
               class="ctrl-slider speed-slider"
               title="Scroll speed"
@@ -99,10 +100,10 @@
                 class="speed-number"
                 :min="MIN_SCROLL_SPEED"
                 :max="MAX_SCROLL_SPEED"
-                step="1"
+                step="any"
                 :value="speed"
                 aria-label="Speed value"
-                inputmode="numeric"
+                inputmode="decimal"
                 @change="setSpeedFromInput"
               />
               <button
@@ -180,6 +181,8 @@
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 7h8l-4-4z"/><path d="M16 17H8l4 4z"/><path d="M3 12h18"/></svg>
         </button>
 
+        <OrientationControl v-model="orientation" @update:model-value="setOrientation" />
+
         <span class="ctrl-separator" aria-hidden="true"></span>
 
         <!-- Remote control share button -->
@@ -256,13 +259,17 @@ import { getScript, updateScrollProgress } from '../storage/db'
 import ShareModal from './ShareModal.vue'
 import SessionModal from './SessionModal.vue'
 import ScrollTimeline from './ScrollTimeline.vue'
+import OrientationControl from './OrientationControl.vue'
 import { useRemoteHost, useShareHost, type RemoteCommand } from '../composables/useRemoteControl'
 import { useVoiceSync, loadCalibratedSpeed } from '../composables/useVoiceSync'
 import { useWakeLock } from '../composables/useWakeLock'
+import { useDisplayOrientation } from '../composables/useDisplayOrientation'
 import {
   MAX_SCROLL_SPEED,
   MIN_SCROLL_SPEED,
+  SCROLL_SPEED_STEP,
   clampScrollSpeed,
+  stepScrollSpeed,
 } from '../constants/teleprompter'
 
 const router = useRouter()
@@ -281,6 +288,7 @@ const editingFrame = ref(false)
 const areaWidth = ref(900)
 const areaOffsetX = ref(0)
 const showShareModal = ref(false)
+const { orientation, orientationClass, setOrientation } = useDisplayOrientation()
 
 useWakeLock(playing)
 
@@ -392,8 +400,8 @@ function handleRemoteCommand(cmd: RemoteCommand) {
   }
 }
 
-function changeSpeed(delta: number) {
-  speed.value = clampScrollSpeed(speed.value + delta)
+function changeSpeed(direction: -1 | 1) {
+  speed.value = stepScrollSpeed(speed.value, direction)
 }
 
 function setSpeedFromInput(event: Event) {
@@ -828,6 +836,30 @@ function positionPopup(e: Event) {
   flex-direction: column;
   overflow: hidden;
   user-select: none;
+}
+
+@media (orientation: portrait) {
+  .tp-root.orientation-landscape {
+    inset: auto;
+    top: 0;
+    left: 100vw;
+    width: 100vh;
+    height: 100vw;
+    transform: rotate(90deg);
+    transform-origin: top left;
+  }
+}
+
+@media (orientation: landscape) {
+  .tp-root.orientation-portrait {
+    inset: auto;
+    top: 100vh;
+    left: 0;
+    width: 100vh;
+    height: 100vw;
+    transform: rotate(-90deg);
+    transform-origin: top left;
+  }
 }
 
 .tp-root.mirrored .tp-scroll {

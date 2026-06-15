@@ -3,7 +3,12 @@ import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { marked } from 'marked'
 import { useShareClient, type SessionPayload } from '../composables/useRemoteControl'
-import { MAX_SCROLL_SPEED, MIN_SCROLL_SPEED } from '../constants/teleprompter'
+import {
+  MAX_SCROLL_SPEED,
+  MIN_SCROLL_SPEED,
+  SCROLL_SPEED_STEP,
+  stepScrollSpeed,
+} from '../constants/teleprompter'
 
 const route = useRoute()
 const router = useRouter()
@@ -120,10 +125,10 @@ function handleKey(e: KeyboardEvent) {
     togglePlay()
   } else if (e.code === 'ArrowUp') {
     e.preventDefault()
-    speed.value = Math.min(MAX_SCROLL_SPEED, speed.value + 1)
+    speed.value = stepScrollSpeed(speed.value, 1)
   } else if (e.code === 'ArrowDown') {
     e.preventDefault()
-    speed.value = Math.max(MIN_SCROLL_SPEED, speed.value - 1)
+    speed.value = stepScrollSpeed(speed.value, -1)
   } else if (e.key === 'm' || e.key === 'M') {
     mirror.value = !mirror.value
   } else if (e.key === 'h' || e.key === 'H') {
@@ -187,6 +192,7 @@ function handleKey(e: KeyboardEvent) {
             type="range"
             :min="MIN_SCROLL_SPEED"
             :max="MAX_SCROLL_SPEED"
+            :step="SCROLL_SPEED_STEP"
             v-model.number="speed"
             class="ctrl-slider"
           />

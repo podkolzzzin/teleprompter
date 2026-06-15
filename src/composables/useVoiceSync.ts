@@ -176,7 +176,7 @@ export function calibrateSpeed(
   if (wpm <= 0 || totalWords <= 0 || totalScrollDistance <= 0) return null
   const pxPerWord = totalScrollDistance / totalWords
   const requiredPPS = (wpm / 60) * pxPerWord
-  const calibrated = Math.round(requiredPPS / 20)
+  const calibrated = requiredPPS / 20
   return clampScrollSpeed(calibrated)
 }
 

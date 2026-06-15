@@ -283,6 +283,44 @@ describe('TeleprompterView', () => {
     )
   })
 
+  it('forces portrait, landscape, or automatic orientation', async () => {
+    vi.mocked(getScript).mockResolvedValue({
+      id: 1,
+      title: 'Test',
+      content: 'Content',
+      createdAt: 1000,
+      updatedAt: 1000,
+    })
+
+    const router = createTestRouter()
+    await router.isReady()
+
+    const wrapper = mount(TeleprompterView, {
+      global: { plugins: [router] },
+    })
+
+    await vi.waitFor(() => {
+      expect(wrapper.find('.loading').exists()).toBe(false)
+    })
+
+    const root = wrapper.find('.tp-root')
+    const trigger = wrapper.find('[title="Screen orientation: Auto"]')
+
+    await trigger.trigger('click')
+    await wrapper.findAll('.orientation-option')[1].trigger('click')
+    expect(root.classes()).toContain('orientation-portrait')
+
+    await wrapper.find('[title="Screen orientation: Vertical"]').trigger('click')
+    await wrapper.findAll('.orientation-option')[2].trigger('click')
+    expect(root.classes()).toContain('orientation-landscape')
+    expect(root.classes()).not.toContain('orientation-portrait')
+
+    await wrapper.find('[title="Screen orientation: Horizontal"]').trigger('click')
+    await wrapper.findAll('.orientation-option')[0].trigger('click')
+    expect(root.classes()).not.toContain('orientation-landscape')
+    expect(root.classes()).not.toContain('orientation-portrait')
+  })
+
   it('toggles controls visibility', async () => {
     vi.mocked(getScript).mockResolvedValue({
       id: 1,

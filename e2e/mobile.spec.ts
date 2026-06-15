@@ -59,11 +59,11 @@ test.describe('Mobile teleprompter workflow', () => {
     await expect(speedSlider).toBeVisible()
 
     // Change speed precisely using the larger numeric control
-    await page.getByLabel('Speed value').fill('27')
+    await page.getByLabel('Speed value').fill('27.4')
     await page.getByLabel('Speed value').press('Enter')
 
     // Verify the speed value updated
-    await expect(page.locator('.ctrl-group').first().locator('.ctrl-value')).toContainText('27')
+    await expect(page.locator('.ctrl-group').first().locator('.ctrl-value')).toContainText('27.4')
   })
 
   test('adjusts font size control on mobile', async ({ page }) => {
@@ -155,6 +155,41 @@ test.describe('Mobile teleprompter workflow', () => {
     // All buttons should be on the same row — allow up to 4px tolerance for
     // sub-pixel rendering differences between the first and last button tops
     expect(Math.abs(firstTop - lastTop)).toBeLessThan(4)
+  })
+
+  test('forced orientation stays fixed when the device rotates', async ({ page }) => {
+    await page.getByRole('button', { name: '▶ Start' }).click()
+    await expect(page).toHaveURL(/\/teleprompter\/\d+/)
+
+    await page.getByTitle('Screen orientation: Auto').tap()
+    await page.getByRole('menuitemradio', { name: 'Horizontal' }).tap()
+    await expect(page.locator('.tp-root')).toHaveClass(/orientation-landscape/)
+    await expect(page.locator('.controls')).toBeVisible()
+    await expect.poll(() => page.locator('.tp-root').evaluate((el) => getComputedStyle(el).transform))
+      .not.toBe('none')
+
+    await page.setViewportSize({ width: 915, height: 412 })
+    await expect(page.locator('.tp-root')).toHaveClass(/orientation-landscape/)
+    await expect(page.locator('.controls')).toBeVisible()
+    await expect.poll(() => page.locator('.tp-root').evaluate((el) => getComputedStyle(el).transform))
+      .toBe('none')
+
+    await page.getByTitle('Screen orientation: Horizontal').tap()
+    await page.getByRole('menuitemradio', { name: 'Vertical' }).tap()
+    await expect(page.locator('.tp-root')).toHaveClass(/orientation-portrait/)
+    await expect(page.locator('.controls')).toBeVisible()
+    await expect.poll(() => page.locator('.tp-root').evaluate((el) => getComputedStyle(el).transform))
+      .not.toBe('none')
+
+    await page.setViewportSize({ width: 412, height: 915 })
+    await expect(page.locator('.tp-root')).toHaveClass(/orientation-portrait/)
+    await expect(page.locator('.controls')).toBeVisible()
+    await expect.poll(() => page.locator('.tp-root').evaluate((el) => getComputedStyle(el).transform))
+      .toBe('none')
+
+    await page.getByTitle('Screen orientation: Vertical').tap()
+    await page.getByRole('menuitemradio', { name: 'Auto' }).tap()
+    await expect(page.locator('.tp-root')).not.toHaveClass(/orientation-(portrait|landscape)/)
   })
 
   test('full mobile workflow: create, edit, preview, teleprompter with all controls, and navigation', async ({ page }) => {
