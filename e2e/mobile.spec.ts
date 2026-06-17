@@ -54,7 +54,7 @@ test.describe('Mobile teleprompter workflow', () => {
     await expect(page).toHaveURL(/\/teleprompter\/\d+/)
 
     // The speed slider should be accessible
-    await page.locator('.speed-control').tap()
+    await page.locator('.speed-control').click()
     const speedSlider = page.getByTitle('Scroll speed')
     await expect(speedSlider).toBeVisible()
 
@@ -158,11 +158,12 @@ test.describe('Mobile teleprompter workflow', () => {
   })
 
   test('forced orientation stays fixed when the device rotates', async ({ page }) => {
+    await page.setViewportSize({ width: 412, height: 915 })
     await page.getByRole('button', { name: '▶ Start' }).click()
     await expect(page).toHaveURL(/\/teleprompter\/\d+/)
 
-    await page.getByTitle('Screen orientation: Auto').tap()
-    await page.getByRole('menuitemradio', { name: 'Horizontal' }).tap()
+    await page.getByTitle('Screen orientation: Auto').click()
+    await page.getByRole('menuitemradio', { name: 'Horizontal' }).click()
     await expect(page.locator('.tp-root')).toHaveClass(/orientation-landscape/)
     await expect(page.locator('.controls')).toBeVisible()
     await expect.poll(() => page.locator('.tp-root').evaluate((el) => getComputedStyle(el).transform))
@@ -174,8 +175,8 @@ test.describe('Mobile teleprompter workflow', () => {
     await expect.poll(() => page.locator('.tp-root').evaluate((el) => getComputedStyle(el).transform))
       .toBe('none')
 
-    await page.getByTitle('Screen orientation: Horizontal').tap()
-    await page.getByRole('menuitemradio', { name: 'Vertical' }).tap()
+    await page.getByTitle('Screen orientation: Horizontal').click()
+    await page.getByRole('menuitemradio', { name: 'Vertical' }).click()
     await expect(page.locator('.tp-root')).toHaveClass(/orientation-portrait/)
     await expect(page.locator('.controls')).toBeVisible()
     await expect.poll(() => page.locator('.tp-root').evaluate((el) => getComputedStyle(el).transform))
@@ -187,8 +188,8 @@ test.describe('Mobile teleprompter workflow', () => {
     await expect.poll(() => page.locator('.tp-root').evaluate((el) => getComputedStyle(el).transform))
       .toBe('none')
 
-    await page.getByTitle('Screen orientation: Vertical').tap()
-    await page.getByRole('menuitemradio', { name: 'Auto' }).tap()
+    await page.getByTitle('Screen orientation: Vertical').click()
+    await page.getByRole('menuitemradio', { name: 'Auto' }).click()
     await expect(page.locator('.tp-root')).not.toHaveClass(/orientation-(portrait|landscape)/)
   })
 
