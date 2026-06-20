@@ -38,6 +38,7 @@ const {
   stopScroll,
   finishScroll,
   setScrollOffset,
+  syncScrollPosition,
 } = useAutoScroller({
   scrollEl,
   trackEl: scrollTrackEl,
@@ -158,6 +159,7 @@ function handleKey(e: KeyboardEvent) {
       class="tp-scroll"
       :style="{ fontSize: fontSize + 'px' }"
       @click="togglePlay"
+      @scroll="syncScrollPosition"
     >
       <div
         ref="scrollTrackEl"
@@ -258,7 +260,6 @@ function handleKey(e: KeyboardEvent) {
 
 .tp-scroll-track {
   min-height: 100%;
-  transform: translate3d(0, calc(var(--scroll-offset, 0px) * -1), 0);
   will-change: transform;
 }
 

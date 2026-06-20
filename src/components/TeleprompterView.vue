@@ -359,6 +359,9 @@ function scheduleSaveProgress() {
 }
 
 function onScroll() {
+  if (!isVoiceSyncActive.value && !autoScrollAnimating.value) {
+    syncScrollPosition()
+  }
   scheduleSaveProgress()
   updateTimelineProgress()
 }
@@ -561,8 +564,8 @@ function toggleVoiceSync() {
     const progress = getScrollProgress()
     if (scrollEl.value) {
       const currentOffset = getScrollOffset()
-      setScrollOffset(0)
       scrollEl.value.scrollTop = currentOffset
+      syncScrollPosition()
     }
     // Parse current script text (strip HTML tags from rendered markdown)
     const tmp = document.createElement('div')
@@ -903,7 +906,6 @@ function positionPopup(e: Event) {
 
 .tp-scroll-track {
   min-height: 100%;
-  transform: translate3d(0, calc(var(--scroll-offset, 0px) * -1), 0);
   will-change: transform;
 }
 

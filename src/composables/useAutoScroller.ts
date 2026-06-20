@@ -61,13 +61,21 @@ export function useAutoScroller({
     animationEndOffset.value = scrollOffset.value
     animationDurationMs.value = 0
     isAnimating.value = false
-    if (scrollEl.value) scrollEl.value.scrollTop = 0
+    if (scrollEl.value) scrollEl.value.scrollTop = scrollOffset.value
     onProgress?.()
   }
 
   function syncScrollPosition() {
-    const nativeScrollTop = scrollEl.value?.scrollTop ?? 0
-    setScrollOffset(nativeScrollTop > 0 ? nativeScrollTop : getAnimatedOffset())
+    const nativeScrollTop = scrollEl.value?.scrollTop
+    if (typeof nativeScrollTop === 'number') {
+      scrollOffset.value = clampOffset(nativeScrollTop)
+      animationStartOffset.value = scrollOffset.value
+      animationEndOffset.value = scrollOffset.value
+      animationDurationMs.value = 0
+      onProgress?.()
+      return
+    }
+    setScrollOffset(getAnimatedOffset())
   }
 
   function startProgressTimer() {
@@ -124,6 +132,7 @@ export function useAutoScroller({
     playing.value = false
     isAnimating.value = false
     stopProgressTimer()
+    if (scrollEl.value) scrollEl.value.scrollTop = scrollOffset.value
     onProgress?.()
   }
 
@@ -139,6 +148,7 @@ export function useAutoScroller({
     playing.value = false
     isAnimating.value = false
     stopProgressTimer()
+    if (scrollEl.value) scrollEl.value.scrollTop = scrollOffset.value
     onProgress?.()
     onEnd?.()
   }

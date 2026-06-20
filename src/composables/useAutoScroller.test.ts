@@ -67,4 +67,47 @@ describe('useAutoScroller', () => {
     expect(playing.value).toBe(false)
     expect(isAnimating.value).toBe(false)
   })
+
+  it('keeps native scroll position usable when setting an idle offset', () => {
+    const container = document.createElement('div')
+    const track = document.createElement('div')
+    let scrollTop = 0
+
+    Object.defineProperties(container, {
+      clientHeight: { configurable: true, value: 500 },
+      scrollTop: {
+        configurable: true,
+        get: () => scrollTop,
+        set: (value: number) => {
+          scrollTop = value
+        },
+      },
+    })
+
+    Object.defineProperty(track, 'scrollHeight', {
+      configurable: true,
+      value: 2000,
+    })
+
+    const scrollEl = shallowRef<HTMLElement | null>(container)
+    const trackEl = shallowRef<HTMLElement | null>(track)
+    const speed = shallowRef(1.2)
+    const playing = shallowRef(false)
+    const { getScrollOffset, setScrollOffset, syncScrollPosition } = useAutoScroller({
+      scrollEl,
+      trackEl,
+      speed,
+      playing,
+    })
+
+    setScrollOffset(300)
+
+    expect(container.scrollTop).toBe(300)
+    expect(getScrollOffset()).toBe(300)
+
+    container.scrollTop = 420
+    syncScrollPosition()
+
+    expect(getScrollOffset()).toBe(420)
+  })
 })
