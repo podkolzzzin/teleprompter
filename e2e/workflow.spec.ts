@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import { waitForVisualScrollOffset } from './helpers/visualScroll'
 
 test.describe('Full teleprompter workflow', () => {
   test('end-to-end: create, preview, edit, teleprompter with all controls', async ({ page }) => {
@@ -101,10 +102,7 @@ test.describe('Full teleprompter workflow', () => {
     await expect(page.locator('.tap-hint')).toContainText('Tap text to pause')
 
     // Wait for meaningful scroll progress
-    await page.waitForFunction(() => {
-      const el = document.querySelector('.tp-scroll')
-      return el && el.scrollTop > 100
-    })
+    await waitForVisualScrollOffset(page, 100)
 
     // ── 10. Pause by clicking scroll area ──
     await page.locator('.tp-scroll').click()
@@ -118,10 +116,7 @@ test.describe('Full teleprompter workflow', () => {
     await page.getByTitle('Play').click()
     await expect(page.getByTitle('Pause')).toBeVisible()
 
-    await page.waitForFunction(() => {
-      const el = document.querySelector('.tp-scroll')
-      return el && el.scrollTop > 200
-    })
+    await waitForVisualScrollOffset(page, 200)
 
     await page.getByTitle('Pause').click()
 
@@ -156,10 +151,7 @@ test.describe('Full teleprompter workflow', () => {
     await expect(page.locator('.ctrl-group').nth(1).locator('.ctrl-value')).toContainText('32px')
 
     await page.getByTitle('Play').click()
-    await page.waitForFunction(() => {
-      const el = document.querySelector('.tp-scroll')
-      return el && el.scrollTop > 250
-    })
+    await waitForVisualScrollOffset(page, 250)
     await page.getByTitle('Pause').click()
 
     // ── 15. Navigate back to home ──
@@ -231,10 +223,7 @@ test.describe('Full teleprompter workflow', () => {
     await page.locator('.ctrl-group').first().hover()
     await page.getByTitle('Scroll speed').fill('12')
     await page.getByTitle('Play').click()
-    await page.waitForFunction(() => {
-      const el = document.querySelector('.tp-scroll')
-      return el && el.scrollTop > 80
-    })
+    await waitForVisualScrollOffset(page, 80)
     await page.getByTitle('Pause').click()
 
     // Go back
@@ -250,10 +239,7 @@ test.describe('Full teleprompter workflow', () => {
     await page.getByTitle('Mirror mode (M)').click()
     await expect(page.locator('.tp-root')).toHaveClass(/mirrored/)
     await page.getByTitle('Play').click()
-    await page.waitForFunction(() => {
-      const el = document.querySelector('.tp-scroll')
-      return el && el.scrollTop > 60
-    })
+    await waitForVisualScrollOffset(page, 60)
     await page.getByTitle('Pause').click()
     await page.getByTitle('Mirror mode (M)').click()
 

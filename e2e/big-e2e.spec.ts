@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test'
 import path from 'path'
+import { getVisualScrollOffset, waitForVisualScrollOffset } from './helpers/visualScroll'
 
 /**
  * PeerJS mock module that uses BroadcastChannel for cross-page communication.
@@ -203,18 +204,13 @@ test.describe('Big E2E test with video proof', () => {
     await expect(page.getByTitle('Pause')).toBeVisible()
     await expect(page.locator('.tap-hint')).toContainText('Tap text to pause')
 
-    await page.waitForFunction(() => {
-      const el = document.querySelector('.tp-scroll')
-      return el && el.scrollTop > 100
-    })
+    await waitForVisualScrollOffset(page, 100)
     // Pause
     await page.locator('.tp-scroll').click()
     await expect(page.getByTitle('Play')).toBeVisible()
 
     // Record scroll position for later verification
-    const hostScrollOffset = await page.evaluate(
-      () => document.querySelector('.tp-scroll')?.scrollTop ?? 0
-    )
+    const hostScrollOffset = await getVisualScrollOffset(page)
     expect(hostScrollOffset).toBeGreaterThan(100)
 
     // ── 7. Share session to another page ────────────────────────────────────
@@ -254,18 +250,13 @@ test.describe('Big E2E test with video proof', () => {
     ).toContainText('64px')
 
     // Verify scroll offset was transferred (should be close to host's offset)
-    const receiverScroll = await receiverPage.evaluate(
-      () => document.querySelector('.tp-scroll')?.scrollTop ?? 0
-    )
+    const receiverScroll = await getVisualScrollOffset(receiverPage)
     expect(receiverScroll).toBeGreaterThan(50)
 
     // Continue playing on receiver and verify it scrolls further
     await receiverPage.getByTitle('Play').click()
     await expect(receiverPage.getByTitle('Pause')).toBeVisible()
-    await receiverPage.waitForFunction(() => {
-      const el = document.querySelector('.tp-scroll')
-      return el && el.scrollTop > 200
-    })
+    await waitForVisualScrollOffset(receiverPage, 200)
     await receiverPage.getByTitle('Pause').click()
 
     // Close receiver
