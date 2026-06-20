@@ -187,7 +187,7 @@ describe('TeleprompterView', () => {
       expect(wrapper.find('.loading').exists()).toBe(false)
     })
 
-    const scrollChildren = wrapper.find('.tp-scroll').element.children
+    const scrollChildren = wrapper.find('.tp-scroll-track').element.children
     expect(scrollChildren[0]?.classList.contains('tp-start-spacer')).toBe(true)
     expect(scrollChildren[1]?.classList.contains('tp-content')).toBe(true)
   })

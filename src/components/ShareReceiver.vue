@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { marked } from 'marked'
 import { useShareClient, type SessionPayload } from '../composables/useRemoteControl'
 import { useAutoScroller } from '../composables/useAutoScroller'
+import { useFullscreen } from '../composables/useFullscreen'
 import {
   MAX_SCROLL_SPEED,
   MIN_SCROLL_SPEED,
@@ -25,9 +26,21 @@ const controlsHidden = ref(false)
 const areaWidth = ref(900)
 const areaOffsetX = ref(0)
 
+const rootEl = ref<HTMLElement | null>(null)
 const scrollEl = ref<HTMLElement | null>(null)
-const { startScroll, pauseScroll, stopScroll, syncScrollPosition } = useAutoScroller({
+const scrollTrackEl = ref<HTMLElement | null>(null)
+const { isFullscreen, toggleFullscreen } = useFullscreen(rootEl)
+const {
+  scrollTrackStyle,
+  isAnimating: autoScrollAnimating,
+  startScroll,
+  pauseScroll,
+  stopScroll,
+  finishScroll,
+  setScrollOffset,
+} = useAutoScroller({
   scrollEl,
+  trackEl: scrollTrackEl,
   speed,
   playing,
 })
@@ -76,14 +89,20 @@ async function applySession(session: SessionPayload) {
   focusOpacity.value = session.settings.focusOpacity ?? 50
   await nextTick()
   if (scrollEl.value) {
-    scrollEl.value.scrollTop = session.scrollOffset
-    syncScrollPosition()
+    setScrollOffset(session.scrollOffset)
   }
 }
 
 function togglePlay() {
   playing.value ? pauseScroll() : startScroll()
 }
+
+watch(speed, () => {
+  if (playing.value) {
+    pauseScroll()
+    startScroll()
+  }
+})
 
 function handleKey(e: KeyboardEvent) {
   if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
@@ -101,10 +120,7 @@ function handleKey(e: KeyboardEvent) {
   } else if (e.key === 'h' || e.key === 'H') {
     controlsHidden.value = !controlsHidden.value
   } else if (e.key === 'r' || e.key === 'R') {
-    if (scrollEl.value) {
-      scrollEl.value.scrollTop = 0
-      syncScrollPosition()
-    }
+    setScrollOffset(0)
   } else if (e.code === 'Escape') {
     router.push('/')
   }
@@ -112,7 +128,7 @@ function handleKey(e: KeyboardEvent) {
 </script>
 
 <template>
-  <div class="tp-root" :class="{ mirrored: mirror, 'controls-hidden': controlsHidden }">
+  <div ref="rootEl" class="tp-root" :class="{ mirrored: mirror, 'controls-hidden': controlsHidden }">
     <div class="focus-overlay" :style="{ opacity: focusOpacity / 100 }"></div>
 
     <!-- Connecting overlay -->
@@ -143,8 +159,16 @@ function handleKey(e: KeyboardEvent) {
       :style="{ fontSize: fontSize + 'px' }"
       @click="togglePlay"
     >
-      <div class="tp-content prose" :style="contentAreaStyle" v-html="renderedContent"></div>
-      <div class="tp-spacer"></div>
+      <div
+        ref="scrollTrackEl"
+        class="tp-scroll-track"
+        :class="{ 'is-auto-scrolling': autoScrollAnimating }"
+        :style="scrollTrackStyle"
+        @animationend="finishScroll"
+      >
+        <div class="tp-content prose" :style="contentAreaStyle" v-html="renderedContent"></div>
+        <div class="tp-spacer"></div>
+      </div>
     </div>
 
     <!-- Controls overlay -->
@@ -184,6 +208,16 @@ function handleKey(e: KeyboardEvent) {
           ↔ Mirror
         </button>
 
+        <button
+          class="ctrl-btn icon-btn fullscreen-btn"
+          :class="{ active: isFullscreen }"
+          @click="toggleFullscreen"
+          :title="isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'"
+        >
+          <svg v-if="!isFullscreen" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 00-2 2v3"/><path d="M21 8V5a2 2 0 00-2-2h-3"/><path d="M3 16v3a2 2 0 002 2h3"/><path d="M16 21h3a2 2 0 002-2v-3"/></svg>
+          <svg v-else viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v3a2 2 0 01-2 2H3"/><path d="M21 8h-3a2 2 0 01-2-2V3"/><path d="M3 16h3a2 2 0 012 2v3"/><path d="M16 21v-3a2 2 0 012-2h3"/></svg>
+        </button>
+
         <button class="ctrl-btn hide-btn" @click="controlsHidden = !controlsHidden">
           {{ controlsHidden ? '⚙' : '✕' }}
         </button>
@@ -220,6 +254,26 @@ function handleKey(e: KeyboardEvent) {
 
 .tp-scroll::-webkit-scrollbar {
   display: none;
+}
+
+.tp-scroll-track {
+  min-height: 100%;
+  transform: translate3d(0, calc(var(--scroll-offset, 0px) * -1), 0);
+  will-change: transform;
+}
+
+.tp-scroll-track.is-auto-scrolling {
+  animation: tp-auto-scroll var(--scroll-duration, 0ms) linear forwards;
+}
+
+@keyframes tp-auto-scroll {
+  from {
+    transform: translate3d(0, calc(var(--scroll-start, 0px) * -1), 0);
+  }
+
+  to {
+    transform: translate3d(0, calc(var(--scroll-end, 0px) * -1), 0);
+  }
 }
 
 .tp-content {

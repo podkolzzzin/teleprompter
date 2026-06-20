@@ -1,5 +1,6 @@
 <template>
   <div
+    ref="rootEl"
     class="tp-root"
     :class="{
       mirrored: mirror,
@@ -32,9 +33,17 @@
       :style="{ fontSize: fontSize + 'px' }"
       @click="onScrollClick"
     >
-      <div class="tp-start-spacer"></div>
-      <div class="tp-content prose" :style="contentAreaStyle" v-html="renderedContent"></div>
-      <div class="tp-spacer"></div>
+      <div
+        ref="scrollTrackEl"
+        class="tp-scroll-track"
+        :class="{ 'is-auto-scrolling': autoScrollAnimating }"
+        :style="scrollTrackStyle"
+        @animationend="finishScroll"
+      >
+        <div class="tp-start-spacer"></div>
+        <div class="tp-content prose" :style="contentAreaStyle" v-html="renderedContent"></div>
+        <div class="tp-spacer"></div>
+      </div>
     </div>
 
     <!-- Controls overlay -->
@@ -185,6 +194,16 @@
 
         <span class="ctrl-separator" aria-hidden="true"></span>
 
+        <button
+          class="ctrl-btn icon-btn fullscreen-btn"
+          :class="{ active: isFullscreen }"
+          @click="toggleFullscreen"
+          :title="isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'"
+        >
+          <svg v-if="!isFullscreen" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 00-2 2v3"/><path d="M21 8V5a2 2 0 00-2-2h-3"/><path d="M3 16v3a2 2 0 002 2h3"/><path d="M16 21h3a2 2 0 002-2v-3"/></svg>
+          <svg v-else viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v3a2 2 0 01-2 2H3"/><path d="M21 8h-3a2 2 0 01-2-2V3"/><path d="M3 16h3a2 2 0 012 2v3"/><path d="M16 21v-3a2 2 0 012-2h3"/></svg>
+        </button>
+
         <!-- Remote control share button -->
         <button
           class="ctrl-btn icon-btn share-btn"
@@ -265,6 +284,7 @@ import { useVoiceSync, loadCalibratedSpeed } from '../composables/useVoiceSync'
 import { useWakeLock } from '../composables/useWakeLock'
 import { useDisplayOrientation } from '../composables/useDisplayOrientation'
 import { useAutoScroller } from '../composables/useAutoScroller'
+import { useFullscreen } from '../composables/useFullscreen'
 import {
   MAX_SCROLL_SPEED,
   MIN_SCROLL_SPEED,
@@ -294,8 +314,11 @@ const { orientation, orientationClass, setOrientation } = useDisplayOrientation(
 
 useWakeLock(playing)
 
+const rootEl = ref<HTMLElement | null>(null)
 const scrollEl = ref<HTMLElement | null>(null)
+const scrollTrackEl = ref<HTMLElement | null>(null)
 const scriptId = ref<number | null>(null)
+const { isFullscreen, toggleFullscreen } = useFullscreen(rootEl)
 
 // ── Voice sync ────────────────────────────────────────────────────────────────
 const {
@@ -319,10 +342,9 @@ const {
 // ── Auto-save scroll progress ─────────────────────────────────────────────────
 function getScrollProgress(): number {
   if (!scrollEl.value) return 0
-  const el = scrollEl.value
-  const maxScroll = el.scrollHeight - el.clientHeight
+  const maxScroll = getMaxScrollDistance()
   if (maxScroll <= 0) return 0
-  return Math.min(1, el.scrollTop / maxScroll)
+  return Math.min(1, getDisplayedScrollTop() / maxScroll)
 }
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null
@@ -347,8 +369,8 @@ const timeLeft = ref(-1)        // seconds remaining at current speed
 
 function updateTimelineProgress() {
   if (!scrollEl.value) return
-  const { scrollTop, scrollHeight, clientHeight } = scrollEl.value
-  const maxScroll = scrollHeight - clientHeight
+  const scrollTop = getDisplayedScrollTop()
+  const maxScroll = getMaxScrollDistance()
   scrollProgress.value = maxScroll > 0 ? scrollTop / maxScroll : 0
   const pps = scrollSpeedToPixelsPerSecond(speed.value)
   timeLeft.value = pps > 0 && maxScroll > 0 ? Math.max(0, maxScroll - scrollTop) / pps : -1
@@ -356,11 +378,7 @@ function updateTimelineProgress() {
 }
 
 function onTimelineSeek(progress: number) {
-  if (!scrollEl.value) return
-  const { scrollHeight, clientHeight } = scrollEl.value
-  scrollEl.value.scrollTop = progress * (scrollHeight - clientHeight)
-  syncScrollPosition()
-  updateTimelineProgress()
+  setDisplayedScrollTop(progress * getMaxScrollDistance())
 }
 
 // Throttled broadcast of scroll progress to remote (at most once per 100 ms)
@@ -393,22 +411,10 @@ function handleRemoteCommand(cmd: RemoteCommand) {
   else if (cmd.type === 'fontUp') fontSize.value = Math.min(96, fontSize.value + 4)
   else if (cmd.type === 'fontDown') fontSize.value = Math.max(24, fontSize.value - 4)
   else if (cmd.type === 'toggleMirror') mirror.value = !mirror.value
-  else if (cmd.type === 'reset' && scrollEl.value) {
-    scrollEl.value.scrollTo({ top: 0, behavior: 'smooth' })
-    syncScrollPosition()
-  } else if (cmd.type === 'scrollUp' && scrollEl.value) {
-    scrollEl.value.scrollBy({ top: -120, behavior: 'smooth' })
-    syncScrollPosition()
-  } else if (cmd.type === 'scrollDown' && scrollEl.value) {
-    scrollEl.value.scrollBy({ top: 120, behavior: 'smooth' })
-    syncScrollPosition()
-  }
-  else if (cmd.type === 'seek' && scrollEl.value) {
-    const { scrollHeight, clientHeight } = scrollEl.value
-    scrollEl.value.scrollTop = cmd.progress * (scrollHeight - clientHeight)
-    syncScrollPosition()
-    updateTimelineProgress()
-  }
+  else if (cmd.type === 'reset') setDisplayedScrollTop(0)
+  else if (cmd.type === 'scrollUp') setDisplayedScrollTop(getDisplayedScrollTop() - 120)
+  else if (cmd.type === 'scrollDown') setDisplayedScrollTop(getDisplayedScrollTop() + 120)
+  else if (cmd.type === 'seek') setDisplayedScrollTop(cmd.progress * getMaxScrollDistance())
 }
 
 function changeSpeed(direction: -1 | 1) {
@@ -432,17 +438,38 @@ const remoteUrl = computed(() => {
 })
 
 const {
+  scrollTrackStyle,
+  isAnimating: autoScrollAnimating,
   startScroll,
   pauseScroll,
   stopScroll,
+  finishScroll,
+  getMaxScrollDistance,
+  getScrollOffset,
+  setScrollOffset,
   syncScrollPosition,
 } = useAutoScroller({
   scrollEl,
+  trackEl: scrollTrackEl,
   speed,
   playing,
-  disabled: isVoiceSyncActive,
-  onFrame: updateTimelineProgress,
+  onProgress: updateTimelineProgress,
 })
+
+function getDisplayedScrollTop(): number {
+  return isVoiceSyncActive.value ? scrollEl.value?.scrollTop ?? 0 : getScrollOffset()
+}
+
+function setDisplayedScrollTop(offset: number) {
+  const maxScroll = getMaxScrollDistance()
+  const nextOffset = Math.max(0, Math.min(maxScroll, offset))
+  if (isVoiceSyncActive.value && scrollEl.value) {
+    scrollEl.value.scrollTop = nextOffset
+    updateTimelineProgress()
+    return
+  }
+  setScrollOffset(nextOffset)
+}
 
 function openShareModal() {
   if (!remotePeerId.value) initRemoteHost()
@@ -493,7 +520,7 @@ watch(sessionShareHostStatus, (newStatus) => {
         areaOffsetX: areaOffsetX.value,
         focusOpacity: focusOpacity.value,
       },
-      scrollOffset: scrollEl.value?.scrollTop ?? 0,
+      scrollOffset: getDisplayedScrollTop(),
     })
   }
 })
@@ -527,16 +554,22 @@ function toggleVoiceSync() {
     if (calibrated !== null) {
       speed.value = calibrated
     }
+    syncScrollPosition()
   } else {
     // Stop fixed-speed auto-scroll to avoid competing scroll mechanisms
     if (playing.value) pauseScroll()
+    const progress = getScrollProgress()
+    if (scrollEl.value) {
+      const currentOffset = getScrollOffset()
+      setScrollOffset(0)
+      scrollEl.value.scrollTop = currentOffset
+    }
     // Parse current script text (strip HTML tags from rendered markdown)
     const tmp = document.createElement('div')
     tmp.innerHTML = renderedContent.value
     const plainText = tmp.textContent || tmp.innerText || ''
     voiceSyncParseScript(plainText)
     // Estimate current word index from scroll progress
-    const progress = getScrollProgress()
     const fromWord = Math.floor(progress * voiceSyncWords.value.length)
     startVoiceSync(fromWord)
     // Build DOM-based word position index for accurate scroll-to-center
@@ -629,10 +662,7 @@ onMounted(async () => {
       if (script.scrollProgress && script.scrollProgress > 0) {
         await nextTick()
         if (scrollEl.value) {
-          const maxScroll = scrollEl.value.scrollHeight - scrollEl.value.clientHeight
-          scrollEl.value.scrollTop = script.scrollProgress * maxScroll
-          syncScrollPosition()
-          updateTimelineProgress()
+          setScrollOffset(script.scrollProgress * getMaxScrollDistance())
         }
       }
     }
@@ -695,11 +725,7 @@ function handleKey(e: KeyboardEvent) {
   } else if (e.key === 's' || e.key === 'S') {
     if (!sessionShareOpen.value) openSessionShare()
   } else if (e.key === 'r' || e.key === 'R') {
-    if (scrollEl.value) {
-      scrollEl.value.scrollTop = 0
-      syncScrollPosition()
-      updateTimelineProgress()
-    }
+    setDisplayedScrollTop(0)
   } else if (e.key === 'v' || e.key === 'V') {
     toggleVoiceSync()
   } else if (e.code === 'Escape') {
@@ -773,6 +799,10 @@ function toggleFrameEdit() {
 
 // Recalculate remaining time immediately when speed changes.
 watch(speed, () => {
+  if (playing.value && !isVoiceSyncActive.value) {
+    pauseScroll()
+    startScroll()
+  }
   updateTimelineProgress()
 })
 
@@ -869,6 +899,26 @@ function positionPopup(e: Event) {
 
 .tp-scroll::-webkit-scrollbar {
   display: none;
+}
+
+.tp-scroll-track {
+  min-height: 100%;
+  transform: translate3d(0, calc(var(--scroll-offset, 0px) * -1), 0);
+  will-change: transform;
+}
+
+.tp-scroll-track.is-auto-scrolling {
+  animation: tp-auto-scroll var(--scroll-duration, 0ms) linear forwards;
+}
+
+@keyframes tp-auto-scroll {
+  from {
+    transform: translate3d(0, calc(var(--scroll-start, 0px) * -1), 0);
+  }
+
+  to {
+    transform: translate3d(0, calc(var(--scroll-end, 0px) * -1), 0);
+  }
 }
 
 .tp-start-spacer {

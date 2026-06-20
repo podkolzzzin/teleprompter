@@ -1,93 +1,159 @@
-import type { Ref } from 'vue'
+import { computed, shallowRef, type Ref } from 'vue'
 import { scrollSpeedToPixelsPerSecond } from '../constants/teleprompter'
 
 interface UseAutoScrollerOptions {
   scrollEl: Ref<HTMLElement | null>
+  trackEl: Ref<HTMLElement | null>
   speed: Ref<number>
   playing: Ref<boolean>
-  disabled?: Ref<boolean>
-  onFrame?: () => void
+  onProgress?: () => void
   onEnd?: () => void
 }
 
 export function useAutoScroller({
   scrollEl,
+  trackEl,
   speed,
   playing,
-  disabled,
-  onFrame,
+  onProgress,
   onEnd,
 }: UseAutoScrollerOptions) {
-  let rafId: number | null = null
-  let lastTime: number | null = null
-  let virtualScrollTop = 0
+  const scrollOffset = shallowRef(0)
+  const animationStartOffset = shallowRef(0)
+  const animationEndOffset = shallowRef(0)
+  const animationDurationMs = shallowRef(0)
+  const isAnimating = shallowRef(false)
+  let progressTimer: ReturnType<typeof setInterval> | null = null
+
+  const scrollTrackStyle = computed(() => ({
+    '--scroll-offset': `${scrollOffset.value}px`,
+    '--scroll-start': `${animationStartOffset.value}px`,
+    '--scroll-end': `${animationEndOffset.value}px`,
+    '--scroll-duration': `${animationDurationMs.value}ms`,
+  }))
+
+  function getMaxScrollDistance(): number {
+    const container = scrollEl.value
+    const track = trackEl.value
+    if (!container || !track) return 0
+    return Math.max(0, track.scrollHeight - container.clientHeight)
+  }
+
+  function clampOffset(offset: number): number {
+    return Math.max(0, Math.min(getMaxScrollDistance(), offset))
+  }
+
+  function getAnimatedOffset(): number {
+    const track = trackEl.value
+    if (!track || !isAnimating.value) return scrollOffset.value
+
+    const transform = getComputedStyle(track).transform
+    if (!transform || transform === 'none') return scrollOffset.value
+    if (typeof DOMMatrixReadOnly === 'undefined') return scrollOffset.value
+
+    const matrix = new DOMMatrixReadOnly(transform)
+    return clampOffset(-matrix.m42)
+  }
+
+  function setScrollOffset(offset: number) {
+    scrollOffset.value = clampOffset(offset)
+    animationStartOffset.value = scrollOffset.value
+    animationEndOffset.value = scrollOffset.value
+    animationDurationMs.value = 0
+    isAnimating.value = false
+    if (scrollEl.value) scrollEl.value.scrollTop = 0
+    onProgress?.()
+  }
 
   function syncScrollPosition() {
-    virtualScrollTop = scrollEl.value?.scrollTop ?? 0
+    const nativeScrollTop = scrollEl.value?.scrollTop ?? 0
+    setScrollOffset(nativeScrollTop > 0 ? nativeScrollTop : getAnimatedOffset())
   }
 
-  function stopScroll() {
-    if (rafId !== null) {
-      cancelAnimationFrame(rafId)
-      rafId = null
+  function startProgressTimer() {
+    stopProgressTimer()
+    progressTimer = setInterval(() => {
+      scrollOffset.value = getAnimatedOffset()
+      onProgress?.()
+    }, 250)
+  }
+
+  function stopProgressTimer() {
+    if (progressTimer !== null) {
+      clearInterval(progressTimer)
+      progressTimer = null
     }
-    lastTime = null
-  }
-
-  function pauseScroll() {
-    playing.value = false
-    stopScroll()
   }
 
   function startScroll() {
-    if (playing.value && rafId !== null) return
-    playing.value = true
-    lastTime = null
-    syncScrollPosition()
-    rafId = requestAnimationFrame(tick)
-  }
+    const maxScroll = getMaxScrollDistance()
+    const currentOffset = clampOffset(getAnimatedOffset())
+    const remainingDistance = maxScroll - currentOffset
 
-  function tick(ts: number) {
-    const el = scrollEl.value
-    if (!playing.value || !el) {
-      stopScroll()
+    if (maxScroll <= 0) {
+      playing.value = true
+      setScrollOffset(0)
       return
     }
 
-    if (lastTime === null) lastTime = ts
-    const delta = Math.min(Math.max(ts - lastTime, 0), 100)
-    lastTime = ts
-
-    if (!disabled?.value) {
-      const maxScroll = Math.max(0, el.scrollHeight - el.clientHeight)
-      const actualScrollTop = el.scrollTop
-      if (Math.abs(actualScrollTop - virtualScrollTop) > 2) {
-        virtualScrollTop = actualScrollTop
-      }
-
-      virtualScrollTop = Math.min(
-        maxScroll,
-        virtualScrollTop + (scrollSpeedToPixelsPerSecond(speed.value) * delta) / 1000
-      )
-      el.scrollTop = virtualScrollTop
-
-      if (virtualScrollTop >= maxScroll - 0.5) {
-        playing.value = false
-        stopScroll()
-        onFrame?.()
-        onEnd?.()
-        return
-      }
+    if (remainingDistance <= 0) {
+      playing.value = false
+      setScrollOffset(maxScroll)
+      return
     }
 
-    onFrame?.()
-    rafId = requestAnimationFrame(tick)
+    const pixelsPerSecond = scrollSpeedToPixelsPerSecond(speed.value)
+    if (pixelsPerSecond <= 0) return
+
+    playing.value = true
+    scrollOffset.value = currentOffset
+    animationStartOffset.value = currentOffset
+    animationEndOffset.value = maxScroll
+    animationDurationMs.value = (remainingDistance / pixelsPerSecond) * 1000
+    isAnimating.value = false
+
+    requestAnimationFrame(() => {
+      if (!playing.value) return
+      isAnimating.value = true
+      startProgressTimer()
+    })
+  }
+
+  function pauseScroll() {
+    scrollOffset.value = getAnimatedOffset()
+    playing.value = false
+    isAnimating.value = false
+    stopProgressTimer()
+    onProgress?.()
+  }
+
+  function stopScroll() {
+    playing.value = false
+    isAnimating.value = false
+    stopProgressTimer()
+  }
+
+  function finishScroll() {
+    if (!isAnimating.value) return
+    scrollOffset.value = animationEndOffset.value
+    playing.value = false
+    isAnimating.value = false
+    stopProgressTimer()
+    onProgress?.()
+    onEnd?.()
   }
 
   return {
+    scrollOffset,
+    scrollTrackStyle,
+    isAnimating,
+    getMaxScrollDistance,
+    getScrollOffset: getAnimatedOffset,
+    setScrollOffset,
+    syncScrollPosition,
     startScroll,
     pauseScroll,
     stopScroll,
-    syncScrollPosition,
+    finishScroll,
   }
 }
