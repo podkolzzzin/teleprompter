@@ -3,6 +3,7 @@ import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { saveScript } from '../storage/db'
 import { useShareClient, type TransferPayload } from '../composables/useRemoteControl'
+import { useAccountSync } from '../composables/useAccountSync'
 
 const route = useRoute()
 const router = useRouter()
@@ -11,6 +12,7 @@ const { status, error, connect, onData } = useShareClient()
 const imported = ref(0)
 const total = ref(0)
 const done = ref(false)
+const { syncNow } = useAccountSync()
 
 onMounted(async () => {
   const peerId = route.params.peerId as string
@@ -39,6 +41,7 @@ async function handleTransfer(payload: TransferPayload) {
     await saveScript(script)
     imported.value++
   }
+  await syncNow()
   done.value = true
 }
 </script>

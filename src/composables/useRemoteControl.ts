@@ -69,6 +69,7 @@ export function useRemoteHost(onCommand: (cmd: RemoteCommand) => void) {
   let peer: Peer | null = null
 
   function init() {
+    if (peer) return
     peer = new Peer()
 
     peer.on('open', (id) => {

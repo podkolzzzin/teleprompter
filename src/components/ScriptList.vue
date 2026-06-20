@@ -3,6 +3,18 @@
     <header class="header">
       <h1 class="logo">📺 Teleprompter</h1>
       <div class="header-actions">
+        <button
+          class="btn-remote"
+          :disabled="!activeRemoteSession"
+          :class="{ active: activeRemoteSession }"
+          title="Attach to the active teleprompter session"
+          @click="attachRemote"
+        >
+          🎛 Remote
+        </button>
+        <button class="btn-account" @click="openPairing" title="Connect this account to another device">
+          🔗 Account
+        </button>
         <button class="btn-import" @click="fileInput?.click()">📄 Import</button>
         <button class="btn-transfer" @click="openTransfer" :disabled="scripts.length === 0" title="Transfer all scripts to another device">📲 Transfer</button>
         <button class="btn-accent" @click="router.push('/edit')">+ New Script</button>
@@ -16,6 +28,23 @@
       />
     </header>
     <p v-if="importError" class="import-error">{{ importError }}</p>
+
+    <!-- Account pairing modal -->
+    <SessionModal
+      v-if="pairingOpen"
+      :url="pairUrl"
+      :status="accountModalStatus"
+      :error-message="accountError"
+      @close="closePairing"
+    >
+      <template #title>
+        <h2 class="modal-title">🔗 Connect Account</h2>
+        <p class="modal-desc">Scan this QR code on another device to merge accounts and keep scripts in sync.</p>
+      </template>
+      <p class="account-meta">
+        {{ connectedDeviceIds.length }} connected · {{ knownDevices.length }} known
+      </p>
+    </SessionModal>
 
     <!-- Transfer modal -->
     <SessionModal
@@ -76,17 +105,35 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { getAllScripts, deleteScript, saveScript, type Script } from '../storage/db'
 import { convertFileToMarkdown, isSupportedFile } from '../utils/fileConverter'
 import { useShareHost } from '../composables/useRemoteControl'
+import { useAccountSync } from '../composables/useAccountSync'
 import SessionModal from './SessionModal.vue'
 
 const router = useRouter()
 const scripts = ref<Script[]>([])
 const fileInput = ref<HTMLInputElement | null>(null)
 const importError = ref('')
+const {
+  knownDevices,
+  connectedDeviceIds,
+  pairingOpen,
+  pairUrl,
+  status: accountStatus,
+  error: accountError,
+  activeRemoteSession,
+  openPairing,
+  closePairing,
+  syncNow,
+} = useAccountSync()
+const accountModalStatus = computed(() => {
+  if (accountStatus.value === 'online') return 'connected'
+  if (accountStatus.value === 'idle') return 'waiting'
+  return accountStatus.value
+})
 
 // Transfer feature
 const transferModalOpen = ref(false)
@@ -173,7 +220,14 @@ async function load() {
   scripts.value = await getAllScripts()
 }
 
-onMounted(load)
+onMounted(() => {
+  load()
+  window.addEventListener('teleprompter:scripts-updated', load)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('teleprompter:scripts-updated', load)
+})
 
 async function handleFileImport(event: Event) {
   importError.value = ''
@@ -191,6 +245,7 @@ async function handleFileImport(event: Event) {
     const { title, content } = await convertFileToMarkdown(file)
     const now = Date.now()
     const id = await saveScript({ title, content, createdAt: now, updatedAt: now })
+    await syncNow()
     input.value = ''
     router.push(`/edit/${id}`)
   } catch {
@@ -219,8 +274,14 @@ function formatDate(ts: number): string {
 async function confirmDelete(id: number) {
   if (confirm('Delete this script?')) {
     await deleteScript(id)
+    await syncNow()
     await load()
   }
+}
+
+function attachRemote() {
+  if (!activeRemoteSession.value) return
+  router.push(`/remote/${activeRemoteSession.value.remotePeerId}`)
 }
 </script>
 
@@ -274,6 +335,25 @@ async function confirmDelete(id: number) {
   border: 1px solid var(--border);
   color: var(--text);
   font-weight: 600;
+}
+
+.btn-account,
+.btn-remote {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-weight: 600;
+}
+
+.btn-remote.active {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.account-meta {
+  color: var(--text-muted);
+  font-size: 13px;
+  text-align: center;
 }
 
 .logo {

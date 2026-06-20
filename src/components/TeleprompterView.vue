@@ -285,6 +285,7 @@ import { useWakeLock } from '../composables/useWakeLock'
 import { useDisplayOrientation } from '../composables/useDisplayOrientation'
 import { useAutoScroller } from '../composables/useAutoScroller'
 import { useFullscreen } from '../composables/useFullscreen'
+import { useAccountSync } from '../composables/useAccountSync'
 import {
   MAX_SCROLL_SPEED,
   MIN_SCROLL_SPEED,
@@ -318,7 +319,9 @@ const rootEl = ref<HTMLElement | null>(null)
 const scrollEl = ref<HTMLElement | null>(null)
 const scrollTrackEl = ref<HTMLElement | null>(null)
 const scriptId = ref<number | null>(null)
+const scriptTitle = ref('Untitled')
 const { isFullscreen, toggleFullscreen } = useFullscreen(rootEl)
+const { publishActiveSession, syncNow } = useAccountSync()
 
 // ── Voice sync ────────────────────────────────────────────────────────────────
 const {
@@ -479,6 +482,20 @@ function openShareModal() {
   showShareModal.value = true
 }
 
+function publishCurrentActiveSession() {
+  if (!playing.value || !remotePeerId.value) {
+    publishActiveSession(null)
+    return
+  }
+
+  publishActiveSession({
+    scriptId: scriptId.value,
+    scriptTitle: scriptTitle.value,
+    remotePeerId: remotePeerId.value,
+    playing: playing.value,
+  })
+}
+
 // Auto-close share modal once remote client connects
 watch(remoteConnected, (connected) => {
   if (connected) showShareModal.value = false
@@ -492,6 +509,10 @@ watch([playing, speed, fontSize, mirror, focusOpacity], () => {
       broadcastState(buildBroadcastState())
     }, 50)
 })
+
+watch([playing, remotePeerId], publishCurrentActiveSession)
+
+let activeSessionTimer: ReturnType<typeof setInterval> | null = null
 
 // ── Session share (share current session state to another device) ─────────────
 const sessionShareOpen = ref(false)
@@ -661,6 +682,7 @@ onMounted(async () => {
     scriptId.value = id
     const script = await getScript(id)
     if (script) {
+      scriptTitle.value = script.title || 'Untitled'
       rawContent.value = script.content
       if (script.scrollProgress && script.scrollProgress > 0) {
         await nextTick()
@@ -675,6 +697,8 @@ onMounted(async () => {
   if (savedSpeed !== null) speed.value = savedSpeed
 
   loading.value = false
+  initRemoteHost()
+  activeSessionTimer = setInterval(publishCurrentActiveSession, 2_000)
   window.addEventListener('keydown', handleKey)
   scrollEl.value?.addEventListener('scroll', onScroll, { passive: true })
 })
@@ -683,6 +707,7 @@ onBeforeUnmount(() => {
   // Save progress while refs are still valid
   if (scriptId.value && scrollEl.value) {
     updateScrollProgress(scriptId.value, getScrollProgress())
+    syncNow()
   }
   if (saveTimer) clearTimeout(saveTimer)
 })
@@ -691,6 +716,8 @@ onUnmounted(() => {
   stopScroll()
   if (isVoiceSyncActive.value) stopVoiceSync()
   if (voiceSyncRafId !== null) cancelAnimationFrame(voiceSyncRafId)
+  if (activeSessionTimer) clearInterval(activeSessionTimer)
+  publishActiveSession(null)
   scrollEl.value?.removeEventListener('scroll', onScroll)
   window.removeEventListener('keydown', handleKey)
   window.removeEventListener('resize', clampFrameToViewport)

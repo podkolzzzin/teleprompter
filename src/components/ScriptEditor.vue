@@ -52,7 +52,8 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { marked } from 'marked'
-import { getScript, saveScript, updateScript } from '../storage/db'
+import { getScript, saveScript, updateScript, type Script } from '../storage/db'
+import { useAccountSync } from '../composables/useAccountSync'
 
 const router = useRouter()
 const route = useRoute()
@@ -62,6 +63,8 @@ const content = ref('')
 const error = ref('')
 const showPreview = ref(false)
 const originalCreatedAt = ref<number>(0)
+const editingScript = ref<Script | null>(null)
+const { syncNow } = useAccountSync()
 
 const isEdit = computed(() => !!route.params.id)
 
@@ -70,6 +73,7 @@ onMounted(async () => {
   if (id) {
     const script = await getScript(id)
     if (script) {
+      editingScript.value = script
       title.value = script.title
       content.value = script.content
       originalCreatedAt.value = script.createdAt
@@ -96,10 +100,13 @@ async function save() {
       content: content.value,
       createdAt: originalCreatedAt.value,
       updatedAt: now,
+      uuid: editingScript.value?.uuid,
+      scrollProgress: editingScript.value?.scrollProgress,
     })
   } else {
     await saveScript({ title: title.value.trim(), content: content.value, createdAt: now, updatedAt: now })
   }
+  await syncNow()
   router.push('/')
 }
 </script>

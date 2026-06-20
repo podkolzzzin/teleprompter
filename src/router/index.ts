@@ -5,6 +5,7 @@ import TeleprompterView from '../components/TeleprompterView.vue'
 import RemoteController from '../components/RemoteController.vue'
 import ShareReceiver from '../components/ShareReceiver.vue'
 import TransferReceiver from '../components/TransferReceiver.vue'
+import AccountConnector from '../components/AccountConnector.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -15,6 +16,7 @@ const router = createRouter({
     { path: '/remote/:peerId', component: RemoteController },
     { path: '/share/:peerId', component: ShareReceiver },
     { path: '/transfer/:peerId', component: TransferReceiver },
+    { path: '/account/:deviceId', component: AccountConnector },
   ]
 })
 
