@@ -4,6 +4,7 @@ import vue from '@vitejs/plugin-vue'
 import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
+  base: process.env.GITHUB_PAGES === 'true' ? '/teleprompter/' : '/',
   test: {
     environment: 'jsdom',
     include: ['src/**/*.{test,spec}.ts'],

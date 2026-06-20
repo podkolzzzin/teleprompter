@@ -7,7 +7,7 @@ import ShareReceiver from '../components/ShareReceiver.vue'
 import TransferReceiver from '../components/TransferReceiver.vue'
 
 const router = createRouter({
-  history: createWebHistory(),
+  history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
     { path: '/', component: ScriptList },
     { path: '/edit/:id?', component: ScriptEditor },

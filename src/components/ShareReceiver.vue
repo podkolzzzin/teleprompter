@@ -3,6 +3,7 @@ import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { marked } from 'marked'
 import { useShareClient, type SessionPayload } from '../composables/useRemoteControl'
+import { useAutoScroller } from '../composables/useAutoScroller'
 import {
   MAX_SCROLL_SPEED,
   MIN_SCROLL_SPEED,
@@ -25,8 +26,11 @@ const areaWidth = ref(900)
 const areaOffsetX = ref(0)
 
 const scrollEl = ref<HTMLElement | null>(null)
-let rafId: number | null = null
-let lastTime: number | null = null
+const { startScroll, pauseScroll, stopScroll, syncScrollPosition } = useAutoScroller({
+  scrollEl,
+  speed,
+  playing,
+})
 
 const renderedContent = computed(() => marked.parse(rawContent.value || '') as string)
 
@@ -73,49 +77,12 @@ async function applySession(session: SessionPayload) {
   await nextTick()
   if (scrollEl.value) {
     scrollEl.value.scrollTop = session.scrollOffset
+    syncScrollPosition()
   }
 }
 
 function togglePlay() {
   playing.value ? pauseScroll() : startScroll()
-}
-
-function startScroll() {
-  playing.value = true
-  lastTime = null
-  rafId = requestAnimationFrame(tick)
-}
-
-function pauseScroll() {
-  playing.value = false
-  stopScroll()
-}
-
-function stopScroll() {
-  if (rafId !== null) {
-    cancelAnimationFrame(rafId)
-    rafId = null
-  }
-}
-
-function tick(ts: number) {
-  if (lastTime === null) lastTime = ts
-  const delta = ts - lastTime
-  lastTime = ts
-
-  if (scrollEl.value) {
-    const pps = speed.value * 20
-    scrollEl.value.scrollTop += (pps * delta) / 1000
-    const el = scrollEl.value
-    if (el.scrollTop + el.clientHeight >= el.scrollHeight - 2) {
-      playing.value = false
-      return
-    }
-  }
-
-  if (playing.value) {
-    rafId = requestAnimationFrame(tick)
-  }
 }
 
 function handleKey(e: KeyboardEvent) {
@@ -134,7 +101,10 @@ function handleKey(e: KeyboardEvent) {
   } else if (e.key === 'h' || e.key === 'H') {
     controlsHidden.value = !controlsHidden.value
   } else if (e.key === 'r' || e.key === 'R') {
-    if (scrollEl.value) scrollEl.value.scrollTop = 0
+    if (scrollEl.value) {
+      scrollEl.value.scrollTop = 0
+      syncScrollPosition()
+    }
   } else if (e.code === 'Escape') {
     router.push('/')
   }

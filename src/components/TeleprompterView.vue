@@ -264,11 +264,13 @@ import { useRemoteHost, useShareHost, type RemoteCommand } from '../composables/
 import { useVoiceSync, loadCalibratedSpeed } from '../composables/useVoiceSync'
 import { useWakeLock } from '../composables/useWakeLock'
 import { useDisplayOrientation } from '../composables/useDisplayOrientation'
+import { useAutoScroller } from '../composables/useAutoScroller'
 import {
   MAX_SCROLL_SPEED,
   MIN_SCROLL_SPEED,
   SCROLL_SPEED_STEP,
   clampScrollSpeed,
+  scrollSpeedToPixelsPerSecond,
   stepScrollSpeed,
 } from '../constants/teleprompter'
 
@@ -293,8 +295,6 @@ const { orientation, orientationClass, setOrientation } = useDisplayOrientation(
 useWakeLock(playing)
 
 const scrollEl = ref<HTMLElement | null>(null)
-let rafId: number | null = null
-let lastTime: number | null = null
 const scriptId = ref<number | null>(null)
 
 // ── Voice sync ────────────────────────────────────────────────────────────────
@@ -350,7 +350,7 @@ function updateTimelineProgress() {
   const { scrollTop, scrollHeight, clientHeight } = scrollEl.value
   const maxScroll = scrollHeight - clientHeight
   scrollProgress.value = maxScroll > 0 ? scrollTop / maxScroll : 0
-  const pps = speed.value * 20
+  const pps = scrollSpeedToPixelsPerSecond(speed.value)
   timeLeft.value = pps > 0 && maxScroll > 0 ? Math.max(0, maxScroll - scrollTop) / pps : -1
   maybeScrollBroadcast()
 }
@@ -359,6 +359,8 @@ function onTimelineSeek(progress: number) {
   if (!scrollEl.value) return
   const { scrollHeight, clientHeight } = scrollEl.value
   scrollEl.value.scrollTop = progress * (scrollHeight - clientHeight)
+  syncScrollPosition()
+  updateTimelineProgress()
 }
 
 // Throttled broadcast of scroll progress to remote (at most once per 100 ms)
@@ -391,12 +393,21 @@ function handleRemoteCommand(cmd: RemoteCommand) {
   else if (cmd.type === 'fontUp') fontSize.value = Math.min(96, fontSize.value + 4)
   else if (cmd.type === 'fontDown') fontSize.value = Math.max(24, fontSize.value - 4)
   else if (cmd.type === 'toggleMirror') mirror.value = !mirror.value
-  else if (cmd.type === 'reset' && scrollEl.value) scrollEl.value.scrollTo({ top: 0, behavior: 'smooth' })
-  else if (cmd.type === 'scrollUp' && scrollEl.value) scrollEl.value.scrollBy({ top: -120, behavior: 'smooth' })
-  else if (cmd.type === 'scrollDown' && scrollEl.value) scrollEl.value.scrollBy({ top: 120, behavior: 'smooth' })
+  else if (cmd.type === 'reset' && scrollEl.value) {
+    scrollEl.value.scrollTo({ top: 0, behavior: 'smooth' })
+    syncScrollPosition()
+  } else if (cmd.type === 'scrollUp' && scrollEl.value) {
+    scrollEl.value.scrollBy({ top: -120, behavior: 'smooth' })
+    syncScrollPosition()
+  } else if (cmd.type === 'scrollDown' && scrollEl.value) {
+    scrollEl.value.scrollBy({ top: 120, behavior: 'smooth' })
+    syncScrollPosition()
+  }
   else if (cmd.type === 'seek' && scrollEl.value) {
     const { scrollHeight, clientHeight } = scrollEl.value
     scrollEl.value.scrollTop = cmd.progress * (scrollHeight - clientHeight)
+    syncScrollPosition()
+    updateTimelineProgress()
   }
 }
 
@@ -418,6 +429,19 @@ const { peerId: remotePeerId, connected: remoteConnected, init: initRemoteHost, 
 const remoteUrl = computed(() => {
   if (!remotePeerId.value) return ''
   return `${window.location.origin}/remote/${remotePeerId.value}`
+})
+
+const {
+  startScroll,
+  pauseScroll,
+  stopScroll,
+  syncScrollPosition,
+} = useAutoScroller({
+  scrollEl,
+  speed,
+  playing,
+  disabled: isVoiceSyncActive,
+  onFrame: updateTimelineProgress,
 })
 
 function openShareModal() {
@@ -607,6 +631,8 @@ onMounted(async () => {
         if (scrollEl.value) {
           const maxScroll = scrollEl.value.scrollHeight - scrollEl.value.clientHeight
           scrollEl.value.scrollTop = script.scrollProgress * maxScroll
+          syncScrollPosition()
+          updateTimelineProgress()
         }
       }
     }
@@ -643,47 +669,6 @@ function togglePlay() {
   playing.value ? pauseScroll() : startScroll()
 }
 
-function startScroll() {
-  playing.value = true
-  lastTime = null
-  rafId = requestAnimationFrame(tick)
-}
-
-function pauseScroll() {
-  playing.value = false
-  stopScroll()
-}
-
-function stopScroll() {
-  if (rafId !== null) {
-    cancelAnimationFrame(rafId)
-    rafId = null
-  }
-}
-
-function tick(ts: number) {
-  if (lastTime === null) lastTime = ts
-  const delta = ts - lastTime
-  lastTime = ts
-
-  if (scrollEl.value && !isVoiceSyncActive.value) {
-    // pixels per second = speed * 20
-    const pps = speed.value * 20
-    scrollEl.value.scrollTop += (pps * delta) / 1000
-
-    // Stop at bottom
-    const el = scrollEl.value
-    if (el.scrollTop + el.clientHeight >= el.scrollHeight - 2) {
-      playing.value = false
-      return
-    }
-  }
-
-  if (playing.value) {
-    rafId = requestAnimationFrame(tick)
-  }
-}
-
 function handleKey(e: KeyboardEvent) {
   if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
   if (e.code === 'Space') {
@@ -710,7 +695,11 @@ function handleKey(e: KeyboardEvent) {
   } else if (e.key === 's' || e.key === 'S') {
     if (!sessionShareOpen.value) openSessionShare()
   } else if (e.key === 'r' || e.key === 'R') {
-    if (scrollEl.value) scrollEl.value.scrollTop = 0
+    if (scrollEl.value) {
+      scrollEl.value.scrollTop = 0
+      syncScrollPosition()
+      updateTimelineProgress()
+    }
   } else if (e.key === 'v' || e.key === 'V') {
     toggleVoiceSync()
   } else if (e.code === 'Escape') {
@@ -782,12 +771,8 @@ function toggleFrameEdit() {
   }
 }
 
-// Restart RAF when speed changes while playing; also recalculate timeLeft
+// Recalculate remaining time immediately when speed changes.
 watch(speed, () => {
-  if (playing.value) {
-    stopScroll()
-    startScroll()
-  }
   updateTimelineProgress()
 })
 
