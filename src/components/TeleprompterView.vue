@@ -397,6 +397,19 @@ const { orientation, orientationClass, setOrientation } = useDisplayOrientation(
 
 useWakeLock(playing)
 
+const PAGE_STATE_KEY = 'teleprompter-page-state'
+
+interface TeleprompterPageState {
+  scriptId: number
+  scrollProgress: number
+  playing: boolean
+  controlsHidden: boolean
+  flipVertically: boolean
+  updatedAt: number
+}
+
+let restoringPageState = false
+
 const rootEl = ref<HTMLElement | null>(null)
 const scrollEl = ref<HTMLElement | null>(null)
 const scrollTrackEl = ref<HTMLElement | null>(null)
@@ -435,6 +448,7 @@ function getScrollProgress(): number {
 let saveTimer: ReturnType<typeof setTimeout> | null = null
 function scheduleSaveProgress() {
   if (!scriptId.value) return
+  persistPageState()
   if (saveTimer) clearTimeout(saveTimer)
   saveTimer = setTimeout(() => {
     if (scriptId.value) {
@@ -449,6 +463,50 @@ function onScroll() {
   }
   scheduleSaveProgress()
   updateTimelineProgress()
+}
+
+function readPageState(id: number): TeleprompterPageState | null {
+  try {
+    if (typeof localStorage === 'undefined' || typeof localStorage.getItem !== 'function') return null
+    const raw = localStorage.getItem(PAGE_STATE_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as Partial<TeleprompterPageState>
+    if (parsed.scriptId !== id) return null
+    return {
+      scriptId: id,
+      scrollProgress: clampProgress(parsed.scrollProgress),
+      playing: parsed.playing === true,
+      controlsHidden: parsed.controlsHidden === true,
+      flipVertically: parsed.flipVertically === true,
+      updatedAt: typeof parsed.updatedAt === 'number' ? parsed.updatedAt : 0,
+    }
+  } catch {
+    return null
+  }
+}
+
+function persistPageState() {
+  if (restoringPageState || !scriptId.value) return
+  try {
+    if (typeof localStorage === 'undefined' || typeof localStorage.setItem !== 'function') return
+    const pageState: TeleprompterPageState = {
+      scriptId: scriptId.value,
+      scrollProgress: getScrollProgress(),
+      playing: playing.value,
+      controlsHidden: controlsHidden.value,
+      flipVertically: flipVertically.value,
+      updatedAt: Date.now(),
+    }
+    localStorage.setItem(PAGE_STATE_KEY, JSON.stringify(pageState))
+  } catch {
+    // Storage can be unavailable in private browsing contexts.
+  }
+}
+
+function clampProgress(value: unknown): number {
+  const numeric = typeof value === 'number' ? value : Number(value)
+  if (!Number.isFinite(numeric)) return 0
+  return Math.max(0, Math.min(1, numeric))
 }
 
 // ── Scroll progress & timeline ────────────────────────────────────────────────
@@ -601,6 +659,7 @@ watch([playing, speed, fontSize, mirror, focusOpacity], () => {
 })
 
 watch([playing, remotePeerId], publishCurrentActiveSession)
+watch([playing, controlsHidden, flipVertically], persistPageState)
 
 let activeSessionTimer: ReturnType<typeof setInterval> | null = null
 
@@ -729,6 +788,7 @@ watch(wordCursor, (newIdx) => {
 onMounted(async () => {
   componentUnmounted = false
   const id = Number(route.params.id)
+  let shouldResumePlaying = false
   if (id) {
     scriptId.value = id
     const script = await getScript(id)
@@ -736,11 +796,16 @@ onMounted(async () => {
     if (script) {
       scriptTitle.value = script.title || 'Untitled'
       rawContent.value = script.content
-      if (script.scrollProgress && script.scrollProgress > 0) {
-        await nextTick()
-        if (scrollEl.value) {
-          setScrollOffset(script.scrollProgress * getMaxScrollDistance())
-        }
+      await nextTick()
+      if (scrollEl.value) {
+        const pageState = readPageState(id)
+        restoringPageState = true
+        controlsHidden.value = pageState?.controlsHidden ?? controlsHidden.value
+        flipVertically.value = pageState?.flipVertically ?? flipVertically.value
+        const savedProgress = pageState?.scrollProgress ?? script.scrollProgress ?? 0
+        setScrollOffset(clampProgress(savedProgress) * getMaxScrollDistance())
+        shouldResumePlaying = pageState?.playing === true
+        restoringPageState = false
       }
     }
   }
@@ -752,12 +817,15 @@ onMounted(async () => {
   initRemoteHost()
   activeSessionTimer = setInterval(publishCurrentActiveSession, 2_000)
   window.addEventListener('keydown', handleKey)
+  window.addEventListener('beforeunload', persistPageState)
   scrollEl.value?.addEventListener('scroll', onScroll, { passive: true })
+  if (shouldResumePlaying) startScroll()
 })
 
 onBeforeUnmount(() => {
   // Save progress while refs are still valid
   if (scriptId.value && scrollEl.value) {
+    persistPageState()
     updateScrollProgress(scriptId.value, getScrollProgress())
     syncNow()
   }
@@ -773,6 +841,7 @@ onUnmounted(() => {
   publishActiveSession(null)
   scrollEl.value?.removeEventListener('scroll', onScroll)
   window.removeEventListener('keydown', handleKey)
+  window.removeEventListener('beforeunload', persistPageState)
   window.removeEventListener('resize', clampFrameToViewport)
   document.removeEventListener('pointermove', onFramePointerMove)
   document.removeEventListener('pointerup', onFramePointerUp)

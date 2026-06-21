@@ -19,6 +19,7 @@ export function useAutoScroller({
   onEnd,
 }: UseAutoScrollerOptions) {
   const scrollOffset = shallowRef(0)
+  const animationBaseOffset = shallowRef(0)
   const animationStartOffset = shallowRef(0)
   const animationEndOffset = shallowRef(0)
   const animationDurationMs = shallowRef(0)
@@ -44,19 +45,25 @@ export function useAutoScroller({
   }
 
   function getAnimatedOffset(): number {
+    if (!isAnimating.value) {
+      const nativeScrollTop = scrollEl.value?.scrollTop
+      return typeof nativeScrollTop === 'number' ? clampOffset(nativeScrollTop) : scrollOffset.value
+    }
+
     const track = trackEl.value
-    if (!track || !isAnimating.value) return scrollOffset.value
+    if (!track) return scrollOffset.value
 
     const transform = getComputedStyle(track).transform
     if (!transform || transform === 'none') return scrollOffset.value
     if (typeof DOMMatrixReadOnly === 'undefined') return scrollOffset.value
 
     const matrix = new DOMMatrixReadOnly(transform)
-    return clampOffset(-matrix.m42)
+    return clampOffset(animationBaseOffset.value - matrix.m42)
   }
 
   function setScrollOffset(offset: number) {
     scrollOffset.value = clampOffset(offset)
+    animationBaseOffset.value = scrollOffset.value
     animationStartOffset.value = scrollOffset.value
     animationEndOffset.value = scrollOffset.value
     animationDurationMs.value = 0
@@ -69,6 +76,7 @@ export function useAutoScroller({
     const nativeScrollTop = scrollEl.value?.scrollTop
     if (typeof nativeScrollTop === 'number') {
       scrollOffset.value = clampOffset(nativeScrollTop)
+      animationBaseOffset.value = scrollOffset.value
       animationStartOffset.value = scrollOffset.value
       animationEndOffset.value = scrollOffset.value
       animationDurationMs.value = 0
@@ -115,8 +123,9 @@ export function useAutoScroller({
 
     playing.value = true
     scrollOffset.value = currentOffset
-    animationStartOffset.value = currentOffset
-    animationEndOffset.value = maxScroll
+    animationBaseOffset.value = currentOffset
+    animationStartOffset.value = 0
+    animationEndOffset.value = remainingDistance
     animationDurationMs.value = (remainingDistance / pixelsPerSecond) * 1000
     isAnimating.value = false
 

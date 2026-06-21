@@ -27,6 +27,8 @@ vi.mock('qrcode', () => ({
 
 import { getScript } from '../storage/db'
 
+const PAGE_STATE_KEY = 'teleprompter-page-state'
+
 const mountedWrappers: VueWrapper[] = []
 
 function mount(...args: Parameters<typeof baseMount>) {
@@ -52,6 +54,7 @@ describe('TeleprompterView', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    localStorage.removeItem(PAGE_STATE_KEY)
     resetTeleprompterSettingsForTest()
     // Mock requestAnimationFrame for scrolling tests
     vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => {
@@ -624,5 +627,91 @@ describe('TeleprompterView', () => {
     })
 
     expect(wrapper.find('.tl-elapsed').text()).toBe('0%')
+  })
+
+  it('restores latest teleprompter page state after reload', async () => {
+    const originalScrollHeight = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollHeight')
+    const originalClientHeight = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientHeight')
+    const originalScrollTop = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollTop')
+    let scrollTop = 0
+
+    try {
+      Object.defineProperties(HTMLElement.prototype, {
+        scrollHeight: {
+          configurable: true,
+          get() {
+            return this.classList?.contains('tp-scroll-track') ? 2000 : 0
+          },
+        },
+        clientHeight: {
+          configurable: true,
+          get() {
+            return this.classList?.contains('tp-scroll') ? 500 : 0
+          },
+        },
+        scrollTop: {
+          configurable: true,
+          get() {
+            return scrollTop
+          },
+          set(value: number) {
+            scrollTop = value
+          },
+        },
+      })
+
+      localStorage.setItem(PAGE_STATE_KEY, JSON.stringify({
+        scriptId: 1,
+        scrollProgress: 0.25,
+        playing: true,
+        controlsHidden: true,
+        flipVertically: true,
+        updatedAt: Date.now(),
+      }))
+
+      vi.mocked(getScript).mockResolvedValue({
+        id: 1,
+        title: 'Test',
+        content: 'Content',
+        createdAt: 1000,
+        updatedAt: 1000,
+        scrollProgress: 0.1,
+      })
+
+      const router = createTestRouter()
+      await router.isReady()
+
+      const wrapper = mount(TeleprompterView, {
+        global: { plugins: [router] },
+      })
+
+      await vi.waitFor(() => {
+        expect(wrapper.find('.loading').exists()).toBe(false)
+      })
+      await vi.waitFor(() => {
+        expect(wrapper.find('.play-btn').attributes('title')).toBe('Pause')
+      })
+
+      expect(scrollTop).toBe(375)
+      expect(wrapper.find('.tl-elapsed').text()).toBe('25%')
+      expect(wrapper.find('.tp-root').classes()).toContain('controls-hidden')
+      expect(wrapper.find('.tp-root').classes()).toContain('flipped-vertically')
+    } finally {
+      if (originalScrollHeight) {
+        Object.defineProperty(HTMLElement.prototype, 'scrollHeight', originalScrollHeight)
+      } else {
+        Reflect.deleteProperty(HTMLElement.prototype, 'scrollHeight')
+      }
+      if (originalClientHeight) {
+        Object.defineProperty(HTMLElement.prototype, 'clientHeight', originalClientHeight)
+      } else {
+        Reflect.deleteProperty(HTMLElement.prototype, 'clientHeight')
+      }
+      if (originalScrollTop) {
+        Object.defineProperty(HTMLElement.prototype, 'scrollTop', originalScrollTop)
+      } else {
+        Reflect.deleteProperty(HTMLElement.prototype, 'scrollTop')
+      }
+    }
   })
 })

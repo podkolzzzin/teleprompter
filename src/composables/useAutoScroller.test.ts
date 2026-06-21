@@ -110,4 +110,60 @@ describe('useAutoScroller', () => {
 
     expect(getScrollOffset()).toBe(420)
   })
+
+  it('pauses at the visual offset without double-counting the native scroll position', async () => {
+    const container = document.createElement('div')
+    const track = document.createElement('div')
+    let scrollTop = 300
+
+    Object.defineProperties(container, {
+      clientHeight: { configurable: true, value: 500 },
+      scrollTop: {
+        configurable: true,
+        get: () => scrollTop,
+        set: (value: number) => {
+          scrollTop = value
+        },
+      },
+    })
+
+    Object.defineProperty(track, 'scrollHeight', {
+      configurable: true,
+      value: 2000,
+    })
+
+    class TestDOMMatrixReadOnly {
+      m42 = 0
+
+      constructor(transform: string) {
+        const values = transform.match(/matrix\((.*)\)/)?.[1]?.split(',').map(Number)
+        this.m42 = values?.[5] ?? 0
+      }
+    }
+
+    vi.stubGlobal('DOMMatrixReadOnly', TestDOMMatrixReadOnly)
+    vi.spyOn(window, 'getComputedStyle').mockReturnValue({
+      transform: 'matrix(1, 0, 0, 1, 0, -120)',
+    } as CSSStyleDeclaration)
+
+    const scrollEl = shallowRef<HTMLElement | null>(container)
+    const trackEl = shallowRef<HTMLElement | null>(track)
+    const speed = shallowRef(1.2)
+    const playing = shallowRef(false)
+    const { pauseScroll, startScroll } = useAutoScroller({
+      scrollEl,
+      trackEl,
+      speed,
+      playing,
+    })
+
+    startScroll()
+    rafCallbacks.shift()?.(0)
+    await nextTick()
+
+    pauseScroll()
+
+    expect(playing.value).toBe(false)
+    expect(container.scrollTop).toBe(420)
+  })
 })
