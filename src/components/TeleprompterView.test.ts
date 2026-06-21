@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { mount as baseMount, type VueWrapper } from '@vue/test-utils'
 import { createRouter, createWebHistory } from 'vue-router'
 import TeleprompterView from './TeleprompterView.vue'
+import { resetTeleprompterSettingsForTest } from '../composables/useTeleprompterSettings'
 
 // Mock the storage module
 vi.mock('../storage/db', () => ({
@@ -26,6 +27,14 @@ vi.mock('qrcode', () => ({
 
 import { getScript } from '../storage/db'
 
+const mountedWrappers: VueWrapper[] = []
+
+function mount(...args: Parameters<typeof baseMount>) {
+  const wrapper = baseMount(...args)
+  mountedWrappers.push(wrapper)
+  return wrapper
+}
+
 function createTestRouter(id = 1) {
   const router = createRouter({
     history: createWebHistory(),
@@ -43,6 +52,7 @@ describe('TeleprompterView', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    resetTeleprompterSettingsForTest()
     // Mock requestAnimationFrame for scrolling tests
     vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => {
       return window.setTimeout(() => cb(performance.now()), 0)
@@ -50,6 +60,9 @@ describe('TeleprompterView', () => {
   })
 
   afterEach(() => {
+    for (const wrapper of mountedWrappers.splice(0)) {
+      wrapper.unmount()
+    }
     if (originalWakeLockDescriptor) {
       Object.defineProperty(navigator, 'wakeLock', originalWakeLockDescriptor)
     } else {

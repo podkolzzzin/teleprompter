@@ -5,6 +5,7 @@ import { marked } from 'marked'
 import { useShareClient, type SessionPayload } from '../composables/useRemoteControl'
 import { useAutoScroller } from '../composables/useAutoScroller'
 import { useFullscreen } from '../composables/useFullscreen'
+import { useTeleprompterSettings } from '../composables/useTeleprompterSettings'
 import {
   MAX_SCROLL_SPEED,
   MIN_SCROLL_SPEED,
@@ -18,13 +19,8 @@ const { status, error, connect, onData } = useShareClient()
 
 const rawContent = ref('')
 const playing = ref(false)
-const speed = ref(5)
-const fontSize = ref(48)
-const mirror = ref(false)
-const focusOpacity = ref(50)
 const controlsHidden = ref(false)
-const areaWidth = ref(900)
-const areaOffsetX = ref(0)
+const { speed, fontSize, mirror, focusOpacity, areaWidth, areaOffsetX, applySettings } = useTeleprompterSettings()
 
 const rootEl = ref<HTMLElement | null>(null)
 const scrollEl = ref<HTMLElement | null>(null)
@@ -82,12 +78,14 @@ onUnmounted(() => {
 
 async function applySession(session: SessionPayload) {
   rawContent.value = session.content
-  speed.value = session.settings.speed
-  fontSize.value = session.settings.fontSize
-  mirror.value = session.settings.mirror
-  areaWidth.value = session.settings.areaWidth
-  areaOffsetX.value = session.settings.areaOffsetX
-  focusOpacity.value = session.settings.focusOpacity ?? 50
+  applySettings({
+    speed: session.settings.speed,
+    fontSize: session.settings.fontSize,
+    mirror: session.settings.mirror,
+    areaWidth: session.settings.areaWidth,
+    areaOffsetX: session.settings.areaOffsetX,
+    focusOpacity: session.settings.focusOpacity ?? 50,
+  })
   await nextTick()
   if (scrollEl.value) {
     setScrollOffset(session.scrollOffset)

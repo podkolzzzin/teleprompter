@@ -51,6 +51,116 @@
       <!-- Timeline progress bar -->
       <ScrollTimeline :progress="scrollProgress" :timeLeft="timeLeft" @seek="onTimelineSeek" />
 
+      <div class="mobile-adjustments" aria-label="Reading controls">
+        <div class="mobile-control-row">
+          <div class="mobile-control-meta">
+            <span class="mobile-control-label">Speed</span>
+            <span class="mobile-control-value">{{ speed }}</span>
+          </div>
+          <div class="mobile-control-field mobile-step-field">
+            <button
+              type="button"
+              class="mobile-step-btn"
+              :disabled="speed <= MIN_SCROLL_SPEED"
+              aria-label="Decrease speed"
+              @click="changeSpeed(-1)"
+            >
+              −
+            </button>
+            <input
+              type="range"
+              :min="MIN_SCROLL_SPEED"
+              :max="MAX_SCROLL_SPEED"
+              :step="SCROLL_SPEED_STEP"
+              v-model.number="speed"
+              class="mobile-slider"
+              title="Scroll speed"
+            />
+            <button
+              type="button"
+              class="mobile-step-btn"
+              :disabled="speed >= MAX_SCROLL_SPEED"
+              aria-label="Increase speed"
+              @click="changeSpeed(1)"
+            >
+              +
+            </button>
+          </div>
+        </div>
+
+        <div class="mobile-control-row">
+          <div class="mobile-control-meta">
+            <span class="mobile-control-label">Text</span>
+            <span class="mobile-control-value">{{ fontSize }}px</span>
+          </div>
+          <div class="mobile-control-field mobile-step-field">
+            <button
+              type="button"
+              class="mobile-step-btn"
+              :disabled="fontSize <= 24"
+              aria-label="Decrease text size"
+              @click="changeFontSize(-1)"
+            >
+              −
+            </button>
+            <input
+              type="range"
+              min="24"
+              max="96"
+              step="4"
+              v-model.number="fontSize"
+              class="mobile-slider"
+              title="Font size"
+            />
+            <button
+              type="button"
+              class="mobile-step-btn"
+              :disabled="fontSize >= 96"
+              aria-label="Increase text size"
+              @click="changeFontSize(1)"
+            >
+              +
+            </button>
+          </div>
+        </div>
+
+        <div class="mobile-control-row">
+          <div class="mobile-control-meta">
+            <span class="mobile-control-label">Focus</span>
+            <span class="mobile-control-value">{{ focusOpacity }}%</span>
+          </div>
+          <div class="mobile-control-field mobile-step-field">
+            <button
+              type="button"
+              class="mobile-step-btn"
+              :disabled="focusOpacity <= 0"
+              aria-label="Decrease focus"
+              @click="changeFocusOpacity(-1)"
+            >
+              −
+            </button>
+            <input
+              type="range"
+              min="0"
+              max="100"
+              step="5"
+              v-model.number="focusOpacity"
+              class="mobile-slider"
+              title="Focus opacity gradient"
+            />
+            <button
+              type="button"
+              class="mobile-step-btn"
+              :disabled="focusOpacity >= 100"
+              aria-label="Increase focus"
+              @click="changeFocusOpacity(1)"
+            >
+              +
+            </button>
+          </div>
+        </div>
+      </div>
+
       <div class="controls-inner">
         <button class="ctrl-btn back-btn" @click="router.push('/')" title="Back">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
@@ -72,7 +182,7 @@
         </button>
 
         <div
-          class="ctrl-group speed-control"
+          class="ctrl-group speed-control desktop-adjust-control"
           tabindex="0"
           @mouseenter="positionPopup"
           @focusin="positionPopup"
@@ -128,7 +238,7 @@
           </div>
         </div>
 
-        <label class="ctrl-group" @mouseenter="positionPopup" @focusin="positionPopup">
+        <label class="ctrl-group desktop-adjust-control" @mouseenter="positionPopup" @focusin="positionPopup">
           <span class="ctrl-label">Size</span>
           <span class="ctrl-value">{{ fontSize }}px</span>
           <div class="ctrl-popup">
@@ -145,7 +255,7 @@
           </div>
         </label>
 
-        <label class="ctrl-group" @mouseenter="positionPopup" @focusin="positionPopup">
+        <label class="ctrl-group desktop-adjust-control" @mouseenter="positionPopup" @focusin="positionPopup">
           <span class="ctrl-label">Focus</span>
           <span class="ctrl-value">{{ focusOpacity }}%</span>
           <div class="ctrl-popup">
@@ -286,6 +396,7 @@ import { useDisplayOrientation } from '../composables/useDisplayOrientation'
 import { useAutoScroller } from '../composables/useAutoScroller'
 import { useFullscreen } from '../composables/useFullscreen'
 import { useAccountSync } from '../composables/useAccountSync'
+import { useTeleprompterSettings } from '../composables/useTeleprompterSettings'
 import {
   MAX_SCROLL_SPEED,
   MIN_SCROLL_SPEED,
@@ -301,16 +412,11 @@ const route = useRoute()
 const loading = ref(true)
 const rawContent = ref('')
 const playing = ref(false)
-const speed = ref(5)
-const fontSize = ref(48)
-const mirror = ref(false)
-const focusOpacity = ref(50)
 const flipVertically = ref(false)
 const controlsHidden = ref(false)
 const editingFrame = ref(false)
-const areaWidth = ref(900)
-const areaOffsetX = ref(0)
 const showShareModal = ref(false)
+const { speed, fontSize, mirror, focusOpacity, areaWidth, areaOffsetX } = useTeleprompterSettings()
 const { orientation, orientationClass, setOrientation } = useDisplayOrientation()
 
 useWakeLock(playing)
@@ -425,6 +531,14 @@ function handleRemoteCommand(cmd: RemoteCommand) {
 
 function changeSpeed(direction: -1 | 1) {
   speed.value = stepScrollSpeed(speed.value, direction)
+}
+
+function changeFontSize(direction: -1 | 1) {
+  fontSize.value = clamp(fontSize.value + direction * 4, 24, 96)
+}
+
+function changeFocusOpacity(direction: -1 | 1) {
+  focusOpacity.value = clamp(focusOpacity.value + direction * 5, 0, 100)
 }
 
 function setSpeedFromInput(event: Event) {
@@ -604,6 +718,7 @@ function toggleVoiceSync() {
 // Smooth-scroll to track the current word position
 let voiceSyncTarget = -1
 let voiceSyncRafId: number | null = null
+let componentUnmounted = false
 
 // DOM-based word position index for accurate scroll-to-center
 let wordScrollPositions: number[] = []
@@ -677,10 +792,12 @@ watch(wordCursor, (newIdx) => {
 })
 
 onMounted(async () => {
+  componentUnmounted = false
   const id = Number(route.params.id)
   if (id) {
     scriptId.value = id
     const script = await getScript(id)
+    if (componentUnmounted) return
     if (script) {
       scriptTitle.value = script.title || 'Untitled'
       rawContent.value = script.content
@@ -713,6 +830,7 @@ onBeforeUnmount(() => {
 })
 
 onUnmounted(() => {
+  componentUnmounted = true
   stopScroll()
   if (isVoiceSyncActive.value) stopVoiceSync()
   if (voiceSyncRafId !== null) cancelAnimationFrame(voiceSyncRafId)
@@ -1003,6 +1121,10 @@ function positionPopup(e: Event) {
 }
 
 .controls-inner::-webkit-scrollbar {
+  display: none;
+}
+
+.mobile-adjustments {
   display: none;
 }
 
@@ -1559,21 +1681,136 @@ function positionPopup(e: Event) {
   .tp-content {
     padding: 24px 24px 0;
   }
+  .controls {
+    background: linear-gradient(transparent, rgba(0, 0, 0, 0.96) 26%);
+    padding: 12px 12px calc(12px + env(safe-area-inset-bottom));
+  }
+  .controls :deep(.scroll-timeline) {
+    margin-bottom: 10px;
+  }
+  .mobile-adjustments {
+    display: grid;
+    gap: 8px;
+    max-width: 900px;
+    margin: 0 auto 10px;
+    pointer-events: auto;
+  }
+  .mobile-control-row {
+    display: grid;
+    grid-template-columns: 74px minmax(0, 1fr);
+    align-items: center;
+    gap: 10px;
+    min-height: 48px;
+    padding: 6px 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+  }
+  .mobile-control-row:first-child {
+    border-top: none;
+  }
+  .mobile-control-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+  .mobile-control-label {
+    color: rgba(255, 255, 255, 0.58);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0;
+    line-height: 1;
+    text-transform: uppercase;
+  }
+  .mobile-control-value {
+    color: #fff;
+    font-size: 18px;
+    font-weight: 750;
+    line-height: 1.1;
+  }
+  .mobile-control-field {
+    min-width: 0;
+  }
+  .mobile-step-field {
+    display: grid;
+    grid-template-columns: 46px minmax(0, 1fr) 46px;
+    align-items: center;
+    gap: 10px;
+  }
+  .mobile-step-btn {
+    width: 46px;
+    height: 46px;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+    font-size: 26px;
+    line-height: 1;
+    touch-action: manipulation;
+  }
+  .mobile-step-btn:disabled {
+    opacity: 0.35;
+  }
+  .mobile-slider {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 28px;
+    padding: 0;
+    border: none;
+    border-radius: 999px;
+    background: transparent;
+    cursor: pointer;
+    touch-action: pan-y;
+  }
+  .mobile-slider:focus {
+    outline: none;
+  }
+  .mobile-slider::-webkit-slider-runnable-track {
+    height: 8px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.24);
+  }
+  .mobile-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 30px;
+    height: 30px;
+    margin-top: -11px;
+    border: 3px solid #101010;
+    border-radius: 50%;
+    background: var(--accent);
+  }
+  .mobile-slider::-moz-range-track {
+    height: 8px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.24);
+  }
+  .mobile-slider::-moz-range-thumb {
+    width: 30px;
+    height: 30px;
+    border: 3px solid #101010;
+    border-radius: 50%;
+    background: var(--accent);
+  }
+  .desktop-adjust-control {
+    display: none;
+  }
   .controls-inner {
     gap: 2px;
+    justify-content: flex-start;
   }
   .ctrl-btn {
-    min-width: 36px;
-    min-height: 36px;
-    padding: 6px;
+    min-width: 44px;
+    min-height: 44px;
+    padding: 8px;
   }
   .ctrl-btn.icon-btn {
-    min-width: 36px;
-    min-height: 36px;
+    min-width: 44px;
+    min-height: 44px;
   }
   .play-btn {
-    min-width: 36px;
-    min-height: 36px;
+    min-width: 48px;
+    min-height: 48px;
   }
   .ctrl-group {
     padding: 4px 6px;
@@ -1581,6 +1818,7 @@ function positionPopup(e: Event) {
   }
   .ctrl-label {
     font-size: 10px;
+    letter-spacing: 0;
   }
   .ctrl-value {
     font-size: 11px;

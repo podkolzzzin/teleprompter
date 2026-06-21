@@ -1,5 +1,22 @@
-import { test, expect } from '@playwright/test'
+import { test, expect, type Page } from '@playwright/test'
 import { waitForVisualScrollOffset } from './helpers/visualScroll'
+
+function visibleSlider(page: Page, title: string) {
+  return page.locator(`input[title="${title}"]:visible`)
+}
+
+async function expectReadingControlValue(page: Page, label: 'Speed' | 'Text' | 'Focus', value: string) {
+  const mobileRow = page.locator('.mobile-control-row:visible').filter({ hasText: label })
+  if (await mobileRow.count()) {
+    await expect(mobileRow.locator('.mobile-control-value')).toContainText(value)
+    return
+  }
+
+  const desktopLabel = label === 'Text' ? 'Size' : label
+  await expect(
+    page.locator('.desktop-adjust-control:visible').filter({ hasText: desktopLabel }).locator('.ctrl-value')
+  ).toContainText(value)
+}
 
 test.describe('Mobile teleprompter workflow', () => {
   test.beforeEach(async ({ page }) => {
@@ -51,34 +68,60 @@ test.describe('Mobile teleprompter workflow', () => {
     await page.getByRole('button', { name: '▶ Start' }).click()
     await expect(page).toHaveURL(/\/teleprompter\/\d+/)
 
-    // The speed slider should be accessible
-    await page.locator('.speed-control').click()
-    const speedSlider = page.getByTitle('Scroll speed')
+    // The speed slider should be accessible without hover-only controls.
+    const speedSlider = visibleSlider(page, 'Scroll speed')
     await expect(speedSlider).toBeVisible()
 
-    // Change speed precisely using the larger numeric control
-    await page.getByLabel('Speed value').fill('27.4')
-    await page.getByLabel('Speed value').press('Enter')
+    await speedSlider.fill('27.4')
 
-    // Verify the speed value updated
-    await expect(page.locator('.ctrl-group').first().locator('.ctrl-value')).toContainText('27.4')
+    await expectReadingControlValue(page, 'Speed', '27.4')
   })
 
   test('adjusts font size control on mobile', async ({ page }) => {
     await page.getByRole('button', { name: '▶ Start' }).click()
     await expect(page).toHaveURL(/\/teleprompter\/\d+/)
 
-    // The font size slider should be accessible
-    await page.locator('.ctrl-group').nth(1).hover()
-    const fontSlider = page.getByTitle('Font size')
+    // The font size slider should be accessible without hover-only controls.
+    const fontSlider = visibleSlider(page, 'Font size')
     await expect(fontSlider).toBeVisible()
 
-    // Change font size
-    await fontSlider.focus()
     await fontSlider.fill('72')
 
-    // Verify the size value updated
-    await expect(page.getByText('72px')).toBeVisible()
+    await expectReadingControlValue(page, 'Text', '72px')
+  })
+
+  test('adjusts focus control on mobile', async ({ page }) => {
+    await page.getByRole('button', { name: '▶ Start' }).click()
+    await expect(page).toHaveURL(/\/teleprompter\/\d+/)
+
+    const focusSlider = visibleSlider(page, 'Focus opacity gradient')
+    await expect(focusSlider).toBeVisible()
+
+    await focusSlider.fill('75')
+
+    await expectReadingControlValue(page, 'Focus', '75%')
+  })
+
+  test('keeps reading settings after reload', async ({ page }) => {
+    await page.getByRole('button', { name: '▶ Start' }).click()
+    await expect(page).toHaveURL(/\/teleprompter\/\d+/)
+
+    await visibleSlider(page, 'Scroll speed').fill('12.5')
+    await visibleSlider(page, 'Font size').fill('72')
+    await visibleSlider(page, 'Focus opacity gradient').fill('75')
+    await page.getByTitle('Mirror mode (M)').click()
+    await expect(page.locator('.tp-root')).toHaveClass(/mirrored/)
+    await expect.poll(() =>
+      page.evaluate(() => localStorage.getItem('teleprompter-device-settings'))
+    ).toContain('"speed":12.5')
+
+    await page.reload()
+    await expect(page.locator('.tp-content')).toContainText('Welcome to Mobile')
+
+    await expectReadingControlValue(page, 'Speed', '12.5')
+    await expectReadingControlValue(page, 'Text', '72px')
+    await expectReadingControlValue(page, 'Focus', '75%')
+    await expect(page.locator('.tp-root')).toHaveClass(/mirrored/)
   })
 
   test('toggles mirror mode on mobile', async ({ page }) => {
@@ -242,13 +285,11 @@ test.describe('Mobile teleprompter workflow', () => {
     await expect(page.locator('.tp-content')).toContainText('Mobile Broadcast')
 
     // ── 3. Increase speed and font size ──
-    await page.locator('.ctrl-group').first().hover()
-    await page.getByTitle('Scroll speed').fill('8')
-    await expect(page.locator('.ctrl-group').first().locator('.ctrl-value')).toContainText('8')
+    await visibleSlider(page, 'Scroll speed').fill('8')
+    await expectReadingControlValue(page, 'Speed', '8')
 
-    await page.locator('.ctrl-group').nth(1).hover()
-    await page.getByTitle('Font size').fill('56')
-    await expect(page.locator('.ctrl-group').nth(1).locator('.ctrl-value')).toContainText('56px')
+    await visibleSlider(page, 'Font size').fill('56')
+    await expectReadingControlValue(page, 'Text', '56px')
 
     // ── 4. Play and let it scroll ──
     await page.getByTitle('Play').click()
@@ -286,10 +327,8 @@ test.describe('Mobile teleprompter workflow', () => {
     await expect(page.locator('.tp-root')).not.toHaveClass(/controls-hidden/)
 
     // ── 8. Change settings again and do final scroll ──
-    await page.locator('.ctrl-group').first().hover()
-    await page.getByTitle('Scroll speed').fill('15')
-    await page.locator('.ctrl-group').nth(1).hover()
-    await page.getByTitle('Font size').fill('40')
+    await visibleSlider(page, 'Scroll speed').fill('15')
+    await visibleSlider(page, 'Font size').fill('40')
     await page.getByTitle('Play').click()
     await waitForVisualScrollOffset(page, 200)
     await page.getByTitle('Pause').click()
@@ -333,8 +372,7 @@ test.describe('Mobile teleprompter workflow', () => {
     await expect(page.locator('.tp-content')).toContainText('Second Script')
 
     // Play with fast speed
-    await page.locator('.ctrl-group').first().hover()
-    await page.getByTitle('Scroll speed').fill('14')
+    await visibleSlider(page, 'Scroll speed').fill('14')
     await page.getByTitle('Play').click()
     await waitForVisualScrollOffset(page, 60)
     await page.getByTitle('Pause').click()
@@ -347,8 +385,7 @@ test.describe('Mobile teleprompter workflow', () => {
     await expect(page.locator('.tp-content')).toContainText('Welcome to Mobile')
 
     // Play with mirror and large font
-    await page.locator('.ctrl-group').nth(1).hover()
-    await page.getByTitle('Font size').fill('72')
+    await visibleSlider(page, 'Font size').fill('72')
     await page.getByTitle('Mirror mode (M)').click()
     await expect(page.locator('.tp-root')).toHaveClass(/mirrored/)
     await page.getByTitle('Play').click()
