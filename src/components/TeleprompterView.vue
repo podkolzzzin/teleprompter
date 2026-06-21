@@ -324,15 +324,6 @@
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
         </button>
 
-        <!-- Session share button -->
-        <button
-          class="ctrl-btn icon-btn"
-          @click="openSessionShare"
-          title="Share this session (S)"
-        >
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
-        </button>
-
         <button class="ctrl-btn icon-btn hide-btn" @click="controlsHidden = !controlsHidden" title="Toggle controls">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg>
         </button>
@@ -362,20 +353,6 @@
       @close="showShareModal = false"
     />
 
-    <!-- Session share modal -->
-    <SessionModal
-      v-if="sessionShareOpen"
-      :url="sessionShareUrl"
-      :status="sessionShareStatus"
-      :error-message="sessionShareError"
-      @close="closeSessionShare"
-    >
-      <template #title>
-        <h2 class="modal-title">📤 Share Session</h2>
-        <p class="modal-desc">Scan the QR code or share the link to let someone view this exact teleprompter session on their device.</p>
-      </template>
-    </SessionModal>
-
     <div v-if="loading" class="loading">Loading…</div>
   </div>
 </template>
@@ -386,10 +363,9 @@ import { useRouter, useRoute } from 'vue-router'
 import { marked } from 'marked'
 import { getScript, updateScrollProgress } from '../storage/db'
 import ShareModal from './ShareModal.vue'
-import SessionModal from './SessionModal.vue'
 import ScrollTimeline from './ScrollTimeline.vue'
 import OrientationControl from './OrientationControl.vue'
-import { useRemoteHost, useShareHost, type RemoteCommand } from '../composables/useRemoteControl'
+import { useRemoteHost, type RemoteCommand } from '../composables/useRemoteControl'
 import { useVoiceSync, loadCalibratedSpeed } from '../composables/useVoiceSync'
 import { useWakeLock } from '../composables/useWakeLock'
 import { useDisplayOrientation } from '../composables/useDisplayOrientation'
@@ -628,47 +604,6 @@ watch([playing, remotePeerId], publishCurrentActiveSession)
 
 let activeSessionTimer: ReturnType<typeof setInterval> | null = null
 
-// ── Session share (share current session state to another device) ─────────────
-const sessionShareOpen = ref(false)
-const { peerId: sessionPeerId, status: sessionShareHostStatus, error: sessionShareHostError, start: startShareHost, send: sendSession, stop: stopShareHost } = useShareHost()
-const sessionShareUrl = ref('')
-const sessionShareStatus = computed(() => sessionShareHostStatus.value)
-const sessionShareError = computed(() => sessionShareHostError.value)
-
-async function openSessionShare() {
-  sessionShareOpen.value = true
-  try {
-    await startShareHost()
-    sessionShareUrl.value = `${window.location.origin}/share/${sessionPeerId.value}`
-  } catch {
-    // error state is set in the composable
-  }
-}
-
-watch(sessionShareHostStatus, (newStatus) => {
-  if (newStatus === 'connected') {
-    sendSession({
-      type: 'session',
-      content: rawContent.value,
-      settings: {
-        speed: speed.value,
-        fontSize: fontSize.value,
-        mirror: mirror.value,
-        areaWidth: areaWidth.value,
-        areaOffsetX: areaOffsetX.value,
-        focusOpacity: focusOpacity.value,
-      },
-      scrollOffset: getDisplayedScrollTop(),
-    })
-  }
-})
-
-function closeSessionShare() {
-  sessionShareOpen.value = false
-  stopShareHost()
-  sessionShareUrl.value = ''
-}
-
 // ── Rendered content ──────────────────────────────────────────────────────────
 const renderedContent = computed(() => {
   return marked.parse(rawContent.value || '') as string
@@ -870,8 +805,6 @@ function handleKey(e: KeyboardEvent) {
     controlsHidden.value = !controlsHidden.value
   } else if (e.key === 'f' || e.key === 'F') {
     toggleFrameEdit()
-  } else if (e.key === 's' || e.key === 'S') {
-    if (!sessionShareOpen.value) openSessionShare()
   } else if (e.key === 'r' || e.key === 'R') {
     setDisplayedScrollTop(0)
   } else if (e.key === 'v' || e.key === 'V') {

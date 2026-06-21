@@ -7,17 +7,9 @@ import ScriptList from './ScriptList.vue'
 vi.mock('../storage/db', () => ({
   getAllScripts: vi.fn(() => Promise.resolve([])),
   deleteScript: vi.fn(() => Promise.resolve()),
-  saveScript: vi.fn(() => Promise.resolve(1)),
 }))
 
-// Mock the file converter module
-vi.mock('../utils/fileConverter', () => ({
-  convertFileToMarkdown: vi.fn(() => Promise.resolve({ title: 'Imported', content: '# Imported content' })),
-  isSupportedFile: vi.fn((file: File) => file.name.endsWith('.docx') || file.name.endsWith('.pdf')),
-}))
-
-import { getAllScripts, deleteScript, saveScript } from '../storage/db'
-import { convertFileToMarkdown, isSupportedFile } from '../utils/fileConverter'
+import { getAllScripts, deleteScript } from '../storage/db'
 
 function createTestRouter() {
   const router = createRouter({
@@ -144,8 +136,10 @@ describe('ScriptList', () => {
     expect(deleteScript).toHaveBeenCalledWith(1)
   })
 
-  it('renders import button', async () => {
-    vi.mocked(getAllScripts).mockResolvedValue([])
+  it('does not render import, share, or transfer actions', async () => {
+    vi.mocked(getAllScripts).mockResolvedValue([
+      { id: 1, title: 'Script One', content: 'Content one', createdAt: 1000, updatedAt: 1000 },
+    ])
 
     const router = createTestRouter()
     await router.isReady()
@@ -154,75 +148,9 @@ describe('ScriptList', () => {
       global: { plugins: [router] },
     })
 
-    expect(wrapper.find('.btn-import').exists()).toBe(true)
-    expect(wrapper.find('.btn-import').text()).toContain('Import')
-  })
-
-  it('has hidden file input for import', async () => {
-    vi.mocked(getAllScripts).mockResolvedValue([])
-
-    const router = createTestRouter()
-    await router.isReady()
-
-    const wrapper = mount(ScriptList, {
-      global: { plugins: [router] },
-    })
-
-    const fileInput = wrapper.find('input[type="file"]')
-    expect(fileInput.exists()).toBe(true)
-    expect(fileInput.attributes('accept')).toBe('.docx,.pdf')
-  })
-
-  it('shows error for unsupported file type on import', async () => {
-    vi.mocked(getAllScripts).mockResolvedValue([])
-    vi.mocked(isSupportedFile).mockReturnValue(false)
-
-    const router = createTestRouter()
-    await router.isReady()
-
-    const wrapper = mount(ScriptList, {
-      global: { plugins: [router] },
-    })
-
-    const fileInput = wrapper.find('input[type="file"]')
-
-    // Create a mock file and trigger change event
-    const mockFile = new File(['test'], 'file.txt', { type: 'text/plain' })
-    Object.defineProperty(fileInput.element, 'files', { value: [mockFile] })
-
-    await fileInput.trigger('change')
-    await wrapper.vm.$nextTick()
-
-    expect(wrapper.find('.import-error').exists()).toBe(true)
-    expect(wrapper.text()).toContain('Unsupported file type')
-  })
-
-  it('imports a supported file and navigates to edit', async () => {
-    vi.mocked(getAllScripts).mockResolvedValue([])
-    vi.mocked(isSupportedFile).mockReturnValue(true)
-    vi.mocked(convertFileToMarkdown).mockResolvedValue({ title: 'My Doc', content: '# Hello' })
-    vi.mocked(saveScript).mockResolvedValue(42)
-
-    const router = createTestRouter()
-    await router.isReady()
-
-    const wrapper = mount(ScriptList, {
-      global: { plugins: [router] },
-    })
-
-    const fileInput = wrapper.find('input[type="file"]')
-    const mockFile = new File(['test'], 'My Doc.docx', { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' })
-    Object.defineProperty(fileInput.element, 'files', { value: [mockFile] })
-
-    await fileInput.trigger('change')
-
-    await vi.waitFor(() => {
-      expect(saveScript).toHaveBeenCalledWith(
-        expect.objectContaining({
-          title: 'My Doc',
-          content: '# Hello',
-        }),
-      )
-    })
+    expect(wrapper.find('.btn-import').exists()).toBe(false)
+    expect(wrapper.find('.btn-transfer').exists()).toBe(false)
+    expect(wrapper.find('.btn-share').exists()).toBe(false)
+    expect(wrapper.find('input[type="file"]').exists()).toBe(false)
   })
 })

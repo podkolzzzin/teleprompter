@@ -15,19 +15,9 @@
         <button class="btn-account" @click="openPairing" title="Connect this account to another device">
           🔗 Account
         </button>
-        <button class="btn-import" @click="fileInput?.click()">📄 Import</button>
-        <button class="btn-transfer" @click="openTransfer" :disabled="scripts.length === 0" title="Transfer all scripts to another device">📲 Transfer</button>
         <button class="btn-accent" @click="router.push('/edit')">+ New Script</button>
       </div>
-      <input
-        ref="fileInput"
-        type="file"
-        accept=".docx,.pdf"
-        class="sr-only"
-        @change="handleFileImport"
-      />
     </header>
-    <p v-if="importError" class="import-error">{{ importError }}</p>
 
     <!-- Account pairing modal -->
     <SessionModal
@@ -44,34 +34,6 @@
       <p class="account-meta">
         {{ connectedDeviceIds.length }} connected · {{ knownDevices.length }} known
       </p>
-    </SessionModal>
-
-    <!-- Transfer modal -->
-    <SessionModal
-      v-if="transferModalOpen"
-      :url="transferUrl"
-      :status="transferStatus"
-      :error-message="transferError"
-      @close="closeTransfer"
-    >
-      <template #title>
-        <h2 class="modal-title">📲 Transfer Scripts</h2>
-        <p class="modal-desc">Scan the QR code or open the link on your other device to transfer all {{ scripts.length }} script{{ scripts.length !== 1 ? 's' : '' }}.</p>
-      </template>
-    </SessionModal>
-
-    <!-- Share single script modal -->
-    <SessionModal
-      v-if="scriptShareOpen"
-      :url="scriptShareUrl"
-      :status="scriptShareStatus"
-      :error-message="scriptShareError"
-      @close="closeScriptShare"
-    >
-      <template #title>
-        <h2 class="modal-title">📤 Share Script</h2>
-        <p class="modal-desc">Scan the QR code or open the link on another device to share "{{ sharingScriptTitle }}".</p>
-      </template>
     </SessionModal>
 
     <main class="content">
@@ -95,7 +57,6 @@
           <div class="card-actions">
             <button class="btn-start" @click.stop="router.push(`/teleprompter/${script.id}`)">▶ Start</button>
             <button class="btn-edit" @click.stop="router.push(`/edit/${script.id}`)">✏ Edit</button>
-            <button class="btn-share" @click.stop="openScriptShare(script)" title="Share this script">📤 Share</button>
             <button class="btn-danger" @click.stop="confirmDelete(script.id!)">🗑 Delete</button>
           </div>
         </li>
@@ -105,18 +66,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { getAllScripts, deleteScript, saveScript, type Script } from '../storage/db'
-import { convertFileToMarkdown, isSupportedFile } from '../utils/fileConverter'
-import { useShareHost } from '../composables/useRemoteControl'
+import { getAllScripts, deleteScript, type Script } from '../storage/db'
 import { useAccountSync } from '../composables/useAccountSync'
 import SessionModal from './SessionModal.vue'
 
 const router = useRouter()
 const scripts = ref<Script[]>([])
-const fileInput = ref<HTMLInputElement | null>(null)
-const importError = ref('')
 const {
   knownDevices,
   connectedDeviceIds,
@@ -135,87 +92,6 @@ const accountModalStatus = computed(() => {
   return accountStatus.value
 })
 
-// Transfer feature
-const transferModalOpen = ref(false)
-const { peerId: transferPeerId, status: transferHostStatus, error: transferHostError, start: startTransferHost, send: sendTransfer, stop: stopTransferHost } = useShareHost()
-const transferUrl = ref('')
-const transferStatus = computed(() => transferHostStatus.value)
-const transferError = computed(() => transferHostError.value)
-
-// Share single script feature
-const scriptShareOpen = ref(false)
-const sharingScriptTitle = ref('')
-const sharingScript = ref<Script | null>(null)
-const { peerId: scriptSharePeerId, status: scriptShareHostStatus, error: scriptShareHostError, start: startScriptShareHost, send: sendScriptShare, stop: stopScriptShareHost } = useShareHost()
-const scriptShareUrl = ref('')
-const scriptShareStatus = computed(() => scriptShareHostStatus.value)
-const scriptShareError = computed(() => scriptShareHostError.value)
-
-async function openTransfer() {
-  transferModalOpen.value = true
-  try {
-    await startTransferHost()
-    transferUrl.value = `${window.location.origin}/transfer/${transferPeerId.value}`
-  } catch {
-    // error state is set in the composable
-  }
-}
-
-watch(transferHostStatus, (newStatus) => {
-  if (newStatus === 'connected') {
-    sendTransfer({
-      type: 'transfer',
-      scripts: scripts.value.map(({ title, content, createdAt, updatedAt }) => ({
-        title,
-        content,
-        createdAt,
-        updatedAt,
-      })),
-    })
-  }
-})
-
-function closeTransfer() {
-  transferModalOpen.value = false
-  stopTransferHost()
-  transferUrl.value = ''
-}
-
-async function openScriptShare(script: Script) {
-  sharingScript.value = script
-  sharingScriptTitle.value = script.title || 'Untitled'
-  scriptShareOpen.value = true
-  try {
-    await startScriptShareHost()
-    scriptShareUrl.value = `${window.location.origin}/transfer/${scriptSharePeerId.value}`
-  } catch {
-    // error state is set in the composable
-  }
-}
-
-watch(scriptShareHostStatus, (newStatus) => {
-  if (newStatus === 'connected' && sharingScript.value) {
-    const s = sharingScript.value
-    sendScriptShare({
-      type: 'transfer',
-      scripts: [{
-        title: s.title,
-        content: s.content,
-        createdAt: s.createdAt,
-        updatedAt: s.updatedAt,
-      }],
-    })
-  }
-})
-
-function closeScriptShare() {
-  scriptShareOpen.value = false
-  stopScriptShareHost()
-  scriptShareUrl.value = ''
-  sharingScript.value = null
-  sharingScriptTitle.value = ''
-}
-
 async function load() {
   scripts.value = await getAllScripts()
 }
@@ -228,31 +104,6 @@ onMounted(() => {
 onUnmounted(() => {
   window.removeEventListener('teleprompter:scripts-updated', load)
 })
-
-async function handleFileImport(event: Event) {
-  importError.value = ''
-  const input = event.target as HTMLInputElement
-  const file = input.files?.[0]
-  if (!file) return
-
-  if (!isSupportedFile(file)) {
-    importError.value = 'Unsupported file type. Please use .docx or .pdf files.'
-    input.value = ''
-    return
-  }
-
-  try {
-    const { title, content } = await convertFileToMarkdown(file)
-    const now = Date.now()
-    const id = await saveScript({ title, content, createdAt: now, updatedAt: now })
-    await syncNow()
-    input.value = ''
-    router.push(`/edit/${id}`)
-  } catch {
-    importError.value = 'Failed to import file. Please try a different file.'
-    input.value = ''
-  }
-}
 
 const sortedScripts = computed(() =>
   [...scripts.value].sort((a, b) => b.createdAt - a.createdAt)
@@ -308,33 +159,6 @@ function attachRemote() {
 .header-actions {
   display: flex;
   gap: 8px;
-}
-
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
-}
-
-.import-error {
-  color: var(--danger);
-  font-size: 14px;
-  text-align: center;
-  padding: 8px 24px;
-  background: var(--surface);
-}
-
-.btn-import {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  color: var(--text);
-  font-weight: 600;
 }
 
 .btn-account,
@@ -476,28 +300,9 @@ function attachRemote() {
   color: #fff;
 }
 
-.btn-share {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  color: var(--text);
-  font-weight: 500;
-}
-
 .btn-danger {
   background: var(--danger);
   color: #fff;
-}
-
-.btn-transfer {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  color: var(--text);
-  font-weight: 500;
-}
-
-.btn-transfer:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
 }
 
 .modal-title {

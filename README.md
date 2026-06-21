@@ -1,6 +1,6 @@
 # 📺 Teleprompter
 
-A Progressive Web App (PWA) teleprompter for reading scripts in the browser. Supports auto-scrolling, adjustable speed and font size, horizontal mirroring, vertical flipping, screen wake lock during playback, remote control, file import, and offline use.
+A Progressive Web App (PWA) teleprompter for reading scripts in the browser. Supports auto-scrolling, adjustable speed and font size, horizontal mirroring, vertical flipping, screen wake lock during playback, remote control, account sync, and offline use.
 
 ## Screenshots
 
@@ -18,9 +18,7 @@ A Progressive Web App (PWA) teleprompter for reading scripts in the browser. Sup
 - 🔆 **Screen Wake Lock** — Keep supported mobile screens awake during playback
 - 🖼️ **Frame Editor** — Drag and resize the content area to fit any physical prompter setup
 - 📲 **Remote Control** — Share a link or QR code so a second device can control playback via WebRTC (PeerJS)
-- 📤 **Session Share** — Share the current teleprompter session (content, settings, scroll position) to another device
-- 📲 **Script Transfer** — Transfer all scripts to another device via WebRTC
-- 📄 **File Import** — Import `.docx` and `.pdf` files, automatically converted to Markdown
+- 🔗 **Account Sync** — Pair devices once and keep scripts/settings synchronized automatically
 - 🎯 **Focus Gradient** — Top/bottom dimming with a centre highlight line for easier reading
 - ⌨️ **Keyboard Shortcuts** — Full keyboard control (see table below)
 - 💾 **Local Storage** — All scripts stored in IndexedDB; no server required
@@ -36,7 +34,6 @@ A Progressive Web App (PWA) teleprompter for reading scripts in the browser. Sup
 | **M** | Toggle mirror mode |
 | **H** | Hide / Show controls |
 | **F** | Toggle frame editor |
-| **S** | Open session share |
 | **R** | Reset scroll to top |
 | **Esc** | Exit frame editor or go back |
 
@@ -48,8 +45,6 @@ A Progressive Web App (PWA) teleprompter for reading scripts in the browser. Sup
 - [idb](https://github.com/jakearchibald/idb) for IndexedDB access
 - [marked](https://marked.js.org/) for Markdown rendering
 - [PeerJS](https://peerjs.com/) for WebRTC remote control
-- [mammoth](https://github.com/mwilliamson/mammoth.js) + [Turndown](https://github.com/mixmark-io/turndown) for DOCX import
-- [pdfjs-dist](https://github.com/nicolo-ribaudo/pdfjs-dist) for PDF import
 - [qrcode](https://github.com/soldair/node-qrcode) for QR code generation
 - [vite-plugin-pwa](https://vite-pwa-org.netlify.app/) for PWA support
 - [Playwright](https://playwright.dev/) + [Vitest](https://vitest.dev/) for testing
@@ -62,28 +57,25 @@ src/
 ├── App.vue                        # Root component (RouterView)
 ├── assets/main.css                # Design tokens and global styles
 ├── components/
-│   ├── ScriptList.vue             # Home page — browse, import, start, edit, delete scripts
+│   ├── ScriptList.vue             # Home page — browse, start, edit, delete, and pair accounts
 │   ├── ScriptEditor.vue           # Markdown editor with live preview
 │   ├── TeleprompterView.vue       # Full-screen scrolling display with controls
 │   ├── RemoteController.vue       # Remote control UI for a second device
-│   ├── ShareReceiver.vue          # Receive a shared teleprompter session
-│   ├── TransferReceiver.vue       # Receive transferred scripts from another device
 │   ├── ShareModal.vue             # QR code + link sharing modal (remote control)
-│   └── SessionModal.vue           # QR code + link modal (session share / transfer)
+│   ├── SessionModal.vue           # QR code + link modal for account pairing
+│   └── AccountConnector.vue       # Account pairing receiver
 ├── composables/
-│   └── useRemoteControl.ts        # PeerJS host/client composables (remote, share, transfer)
-├── router/index.ts                # Route definitions (/, /edit/:id?, /teleprompter/:id, /remote/:peerId, /share/:peerId, /transfer/:peerId)
-├── storage/db.ts                  # IndexedDB CRUD helpers
-└── utils/
-    └── fileConverter.ts           # DOCX/PDF → Markdown conversion
+│   ├── useRemoteControl.ts        # PeerJS host/client composables for remote control
+│   └── useAccountSync.ts          # Automatic script/settings sync between paired devices
+├── router/index.ts                # Route definitions (/, /edit/:id?, /teleprompter/:id, /remote/:peerId, /account/:deviceId)
+└── storage/db.ts                  # IndexedDB CRUD helpers
 e2e/
 ├── app.spec.ts                    # Basic app, editor, and teleprompter tests
 ├── script-management.spec.ts      # CRUD: edit, preserve, delete, multi-script
 ├── workflow.spec.ts               # Full create → edit → teleprompter workflows
 ├── teleprompter-controls.spec.ts  # Sliders, mirror, frame editor, keyboard shortcuts
 ├── mobile.spec.ts                 # Mobile-specific viewport tests
-├── big-e2e.spec.ts                # Comprehensive E2E: create (manual/pdf/docx), play, share, persist, transfer
-└── fixtures/                      # Test fixture files for file import testing
+└── big-e2e.spec.ts                # Comprehensive E2E: create scripts, play, persist, verify legacy actions are hidden
 playwright.config.ts               # Playwright configuration (3 projects, video recording)
 ```
 
@@ -157,7 +149,7 @@ npm run test:e2e:ui
 | `workflow.spec.ts` | Full create → preview → edit → teleprompter workflow with all controls; multi-script launch & delete |
 | `teleprompter-controls.spec.ts` | Speed/font sliders, mirror mode, frame editor, controls hide/show, keyboard shortcuts (Space, M, H, F), tap-to-pause, frame drag in mirror mode |
 | `mobile.spec.ts` | Mobile viewport: launch, play, speed/font controls, mirror, hide/show, full mobile workflow, multi-script |
-| **`big-e2e.spec.ts`** | **Comprehensive E2E with video proof**: create 3 scripts (manual, PDF import, DOCX import), play with settings, share session to another browser page (PeerJS mock via BroadcastChannel), verify transferred offset & settings, continue playing on receiver, verify persistence after close/reopen, transfer all scripts to new instance |
+| **`big-e2e.spec.ts`** | **Comprehensive E2E with video proof**: create scripts manually, play with settings, verify persistence after close/reopen, and verify legacy import/share/transfer actions stay hidden |
 
 Tests run across 3 Playwright projects: Desktop Chrome, Pixel 7 portrait, and Pixel 7 landscape. The big E2E test runs only on Desktop Chrome.
 

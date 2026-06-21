@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue'
 import QRCode from 'qrcode'
-import type { HostStatus } from '../composables/useRemoteControl'
+
+type ModalStatus = 'idle' | 'waiting' | 'connecting' | 'connected' | 'error'
 
 const props = defineProps<{
   url: string
-  status: HostStatus | 'idle' | 'connecting' | 'connected' | 'error'
+  status: ModalStatus
   errorMessage?: string
 }>()
 
@@ -48,9 +49,9 @@ async function copyLink() {
         <div v-else class="qr-skeleton">Generating QR…</div>
       </div>
 
-      <p class="url-label">Or copy the link:</p>
+      <p class="url-label">Or copy the pairing link:</p>
       <div class="url-row">
-        <input class="url-input" :value="url" readonly aria-label="Share link" />
+        <input class="url-input" :value="url" readonly aria-label="Pairing link" />
         <button class="btn-copy" @click="copyLink">{{ copied ? '✓ Copied' : 'Copy' }}</button>
       </div>
 
@@ -63,7 +64,7 @@ async function copyLink() {
         }"
       >
         <template v-if="status === 'waiting'">⏳ Waiting for the other device to connect…</template>
-        <template v-else-if="status === 'connected'">✅ Connected! Sending data…</template>
+        <template v-else-if="status === 'connected'">✅ Connected! Syncing data…</template>
         <template v-else-if="status === 'error'">❌ Error: {{ errorMessage }}</template>
         <template v-else>Initialising…</template>
       </div>

@@ -1,11 +1,10 @@
 import { test, expect, type Page } from '@playwright/test'
-import path from 'path'
 import { getVisualScrollOffset, waitForVisualScrollOffset } from './helpers/visualScroll'
 
 /**
  * PeerJS mock module that uses BroadcastChannel for cross-page communication.
- * Replaces the real PeerJS library so that share/transfer flows work
- * between Playwright pages without an external signaling server.
+ * Replaces the real PeerJS library so remote-control hosting can initialise
+ * without an external signaling server.
  */
 const PEERJS_MOCK = `
 const _bc = new BroadcastChannel('peerjs-e2e-mock');
@@ -129,7 +128,7 @@ const longScriptContent =
   '*— End of Script —*'
 
 test.describe('Big E2E test with video proof', () => {
-  test('comprehensive: create 3 scripts (manual, pdf, docx), play, share session, persist, transfer', async ({ page, context, browser }, testInfo) => {
+  test('comprehensive: create scripts, play, persist, and hide legacy import/share/transfer actions', async ({ page, context }, testInfo) => {
     test.skip(testInfo.project.name !== 'chromium', 'Desktop Chrome only')
     test.setTimeout(120_000)
 
@@ -157,49 +156,49 @@ test.describe('Big E2E test with video proof', () => {
     await expect(page).toHaveURL('/')
     await expect(page.getByText('Manual Script')).toBeVisible()
 
-    // ── 3. Import PDF script ────────────────────────────────────────────────
-    const fileInput = page.locator('input[type="file"]')
-    await fileInput.setInputFiles(
-      path.resolve(__dirname, 'fixtures/news-broadcast.pdf')
-    )
-    await expect(page).toHaveURL(/\/edit\/\d+/)
-    await expect(page.getByLabel('Title')).toHaveValue('news-broadcast')
-    // Rename for clarity
-    await page.getByLabel('Title').fill('PDF News Script')
+    // ── 3. Create additional scripts manually ───────────────────────────────
+    await page.getByRole('button', { name: '+ New Script' }).click()
+    await expect(page).toHaveURL(/\/edit$/)
+    await page.getByLabel('Title').fill('Second Manual Script')
+    await page.getByLabel('Content (Markdown)').fill('# Second Script\n\nAccount sync handles this content automatically.')
     await page.getByRole('button', { name: 'Save' }).click()
     await expect(page).toHaveURL('/')
 
-    // ── 4. Import DOCX script ───────────────────────────────────────────────
-    await fileInput.setInputFiles(
-      path.resolve(__dirname, 'fixtures/presentation-notes.docx')
-    )
-    await expect(page).toHaveURL(/\/edit\/\d+/)
-    await expect(page.getByLabel('Title')).toHaveValue('presentation-notes')
-    await page.getByLabel('Title').fill('DOCX Presentation')
+    await page.getByRole('button', { name: '+ New Script' }).click()
+    await expect(page).toHaveURL(/\/edit$/)
+    await page.getByLabel('Title').fill('Third Manual Script')
+    await page.getByLabel('Content (Markdown)').fill('# Third Script\n\nAnother script for persistence coverage.')
     await page.getByRole('button', { name: 'Save' }).click()
     await expect(page).toHaveURL('/')
 
-    // ── Verify 3 scripts ────────────────────────────────────────────────────
+    // ── Verify 3 scripts and removed legacy actions ─────────────────────────
     await expect(page.locator('.script-card')).toHaveCount(3)
-    await expect(page.locator('.card-title', { hasText: 'Manual Script' })).toBeVisible()
-    await expect(page.locator('.card-title', { hasText: 'PDF News Script' })).toBeVisible()
-    await expect(page.locator('.card-title', { hasText: 'DOCX Presentation' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Manual Script', exact: true })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Second Manual Script', exact: true })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Third Manual Script', exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: /Import/ })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: /Transfer/ })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: /Share/ })).toHaveCount(0)
+    await expect(page.locator('input[type="file"]')).toHaveCount(0)
 
-    // ── 5. Launch the long manual script & modify settings ──────────────────
-    const manualCard = page.locator('.script-card', { hasText: 'Manual Script' })
+    // ── 4. Launch the long manual script & modify settings ──────────────────
+    const manualCard = page.locator('.script-card', {
+      has: page.getByRole('heading', { name: 'Manual Script', exact: true }),
+    })
     await manualCard.getByRole('button', { name: '▶ Start' }).click()
     await expect(page).toHaveURL(/\/teleprompter\/\d+/)
     await expect(page.locator('.tp-content')).toContainText('Act One: The Opening Scene')
+    await expect(page.getByTitle('Share this session (S)')).toHaveCount(0)
 
     // Change speed and font
     await page.locator('.ctrl-group').first().hover()
-    await page.getByTitle('Scroll speed').fill('10')
+    await page.locator('#speed-slider').fill('10')
     await expect(page.locator('.ctrl-group').first().locator('.ctrl-value')).toContainText('10')
     await page.locator('.ctrl-group').nth(1).hover()
-    await page.getByTitle('Font size').fill('64')
+    await page.locator('#size-slider').fill('64')
     await expect(page.locator('.ctrl-group').nth(1).locator('.ctrl-value')).toContainText('64px')
 
-    // ── 6. Play and let it scroll ───────────────────────────────────────────
+    // ── 5. Play and let it scroll ───────────────────────────────────────────
     await page.getByTitle('Play').click()
     await expect(page.getByTitle('Pause')).toBeVisible()
     await expect(page.locator('.tap-hint')).toContainText('Tap text to pause')
@@ -213,115 +212,26 @@ test.describe('Big E2E test with video proof', () => {
     const hostScrollOffset = await getVisualScrollOffset(page)
     expect(hostScrollOffset).toBeGreaterThan(100)
 
-    // ── 7. Share session to another page ────────────────────────────────────
-    await page.getByTitle('Share this session (S)').click()
-    await expect(page.locator('.modal-backdrop')).toBeVisible()
-
-    // Wait for the share URL to be populated
-    await page.waitForFunction(() => {
-      const input = document.querySelector('.url-input') as HTMLInputElement
-      return input && input.value && input.value.includes('/share/')
-    })
-    const shareUrl = await page.locator('.url-input').inputValue()
-    expect(shareUrl).toContain('/share/')
-
-    // Host should show waiting status
-    await expect(page.locator('.status-banner')).toContainText('Waiting')
-
-    // Open receiver page in the same context (shared BroadcastChannel)
-    const receiverPage = await context.newPage()
-    await setupPeerMock(receiverPage)
-    await receiverPage.goto(shareUrl)
-
-    // Host should transition to connected
-    await expect(page.locator('.status-banner')).toContainText('Connected', { timeout: 10_000 })
-
-    // Receiver should get the session content
-    await expect(
-      receiverPage.locator('.tp-content')
-    ).toContainText('Act One: The Opening Scene', { timeout: 10_000 })
-
-    // Verify settings were transferred to receiver
-    await expect(
-      receiverPage.locator('.ctrl-group').first().locator('.ctrl-value')
-    ).toContainText('10')
-    await expect(
-      receiverPage.locator('.ctrl-group').nth(1).locator('.ctrl-value')
-    ).toContainText('64px')
-
-    // Verify scroll offset was transferred (should be close to host's offset)
-    const receiverScroll = await getVisualScrollOffset(receiverPage)
-    expect(receiverScroll).toBeGreaterThan(50)
-
-    // Continue playing on receiver and verify it scrolls further
-    await receiverPage.getByTitle('Play').click()
-    await expect(receiverPage.getByTitle('Pause')).toBeVisible()
-    await waitForVisualScrollOffset(receiverPage, 200)
-    await receiverPage.getByTitle('Pause').click()
-
-    // Close receiver
-    await receiverPage.close()
-
-    // Close share modal on host
-    await page.locator('.modal-close').click()
-    await expect(page.locator('.modal-backdrop')).not.toBeVisible()
-
-    // ── 8. Verify script remains in list after playing ──────────────────────
+    // ── 6. Verify script remains in list after playing ──────────────────────
     await page.getByTitle('Back').click()
     await expect(page).toHaveURL('/')
     await expect(page.locator('.script-card')).toHaveCount(3)
-    await expect(page.locator('.card-title', { hasText: 'Manual Script' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Manual Script', exact: true })).toBeVisible()
 
-    // ── 9. Close page, reopen, verify persistence ───────────────────────────
+    // ── 7. Close page, reopen, verify persistence ───────────────────────────
     await page.close()
     const freshPage = await context.newPage()
     await setupPeerMock(freshPage)
     await freshPage.goto('/')
     await expect(freshPage.locator('.script-card')).toHaveCount(3)
-    await expect(freshPage.locator('.card-title', { hasText: 'Manual Script' })).toBeVisible()
-    await expect(freshPage.locator('.card-title', { hasText: 'PDF News Script' })).toBeVisible()
-    await expect(freshPage.locator('.card-title', { hasText: 'DOCX Presentation' })).toBeVisible()
+    await expect(freshPage.getByRole('heading', { name: 'Manual Script', exact: true })).toBeVisible()
+    await expect(freshPage.getByRole('heading', { name: 'Second Manual Script', exact: true })).toBeVisible()
+    await expect(freshPage.getByRole('heading', { name: 'Third Manual Script', exact: true })).toBeVisible()
+    await expect(freshPage.getByRole('button', { name: /Import/ })).toHaveCount(0)
+    await expect(freshPage.getByRole('button', { name: /Transfer/ })).toHaveCount(0)
+    await expect(freshPage.getByRole('button', { name: /Share/ })).toHaveCount(0)
 
-    // ── 10. Transfer all scripts to a new page ──────────────────────────────
-    await freshPage.getByRole('button', { name: '📲 Transfer' }).click()
-    await expect(freshPage.locator('.modal-backdrop')).toBeVisible()
-
-    // Wait for transfer URL
-    await freshPage.waitForFunction(() => {
-      const input = document.querySelector('.url-input') as HTMLInputElement
-      return input && input.value && input.value.includes('/transfer/')
-    })
-    const transferUrl = await freshPage.locator('.url-input').inputValue()
-    expect(transferUrl).toContain('/transfer/')
-
-    // Open transfer receiver page
-    const transferPage = await context.newPage()
-    await setupPeerMock(transferPage)
-    await transferPage.goto(transferUrl)
-
-    // Host should show connected
-    await expect(freshPage.locator('.status-banner')).toContainText('Connected', { timeout: 10_000 })
-
-    // Receiver should show transfer complete
-    await expect(transferPage.getByText('Transfer complete!')).toBeVisible({ timeout: 10_000 })
-    await expect(transferPage.getByText('3 scripts imported')).toBeVisible()
-
-    // Navigate receiver to home and verify all scripts are present
-    await transferPage.getByRole('button', { name: 'View Scripts' }).click()
-    await expect(transferPage).toHaveURL('/')
-    // Same context → shared IndexedDB, so 3 original + 3 transferred = 6
-    await expect(transferPage.locator('.script-card')).toHaveCount(6)
-
-    // Verify all original titles appear (transferred copies have same titles)
-    await expect(transferPage.locator('.card-title', { hasText: 'Manual Script' }).first()).toBeVisible()
-    await expect(transferPage.locator('.card-title', { hasText: 'PDF News Script' }).first()).toBeVisible()
-    await expect(transferPage.locator('.card-title', { hasText: 'DOCX Presentation' }).first()).toBeVisible()
-
-    // Cleanup
-    await transferPage.close()
-    await freshPage.locator('.modal-close').click()
-
-    // ── 11. Final console-error check ───────────────────────────────────────
+    // ── 8. Final console-error check ────────────────────────────────────────
     expect(consoleErrors, 'Expected no browser console errors').toEqual([])
   })
 })

@@ -3,8 +3,6 @@ import ScriptList from '../components/ScriptList.vue'
 import ScriptEditor from '../components/ScriptEditor.vue'
 import TeleprompterView from '../components/TeleprompterView.vue'
 import RemoteController from '../components/RemoteController.vue'
-import ShareReceiver from '../components/ShareReceiver.vue'
-import TransferReceiver from '../components/TransferReceiver.vue'
 import AccountConnector from '../components/AccountConnector.vue'
 
 const router = createRouter({
@@ -14,8 +12,6 @@ const router = createRouter({
     { path: '/edit/:id?', component: ScriptEditor },
     { path: '/teleprompter/:id', component: TeleprompterView },
     { path: '/remote/:peerId', component: RemoteController },
-    { path: '/share/:peerId', component: ShareReceiver },
-    { path: '/transfer/:peerId', component: TransferReceiver },
     { path: '/account/:deviceId', component: AccountConnector },
   ]
 })
