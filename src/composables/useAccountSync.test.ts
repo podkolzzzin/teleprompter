@@ -47,6 +47,8 @@ const peerState = vi.hoisted(() => {
     id?: string
     connections: MockConnection[] = []
     destroyed = false
+    disconnected = false
+    reconnects = 0
     private handlers = new Map<string, Handler[]>()
 
     constructor(id?: string) {
@@ -68,7 +70,14 @@ const peerState = vi.hoisted(() => {
       this.destroyed = true
     }
 
+    reconnect() {
+      this.reconnects += 1
+      this.disconnected = false
+    }
+
     emit(event: string, ...args: any[]) {
+      if (event === 'disconnected') this.disconnected = true
+      if (event === 'open') this.disconnected = false
       for (const handler of this.handlers.get(event) ?? []) {
         handler(...args)
       }
@@ -164,6 +173,43 @@ describe('useAccountSync', () => {
 
     expect(sync.pairingOpen.value).toBe(true)
     expect(peerState.instances).toHaveLength(1)
+
+    sync.stop()
+    wrapper.unmount()
+  })
+
+  it('retries recoverable PeerJS server disconnects without showing an error state', async () => {
+    vi.useFakeTimers()
+    let sync!: ReturnType<typeof useAccountSync>
+
+    const Harness = defineComponent({
+      setup() {
+        sync = useAccountSync()
+        return () => h('div')
+      },
+    })
+
+    const wrapper = mount(Harness)
+    await nextTick()
+
+    sync.openPairing()
+
+    const peer = peerState.instances[0]
+    peer.emit('error', { type: 'network', message: 'Lost connection to server.' })
+    peer.emit('disconnected')
+
+    expect(sync.status.value).toBe('connecting')
+    expect(sync.error.value).toBe('Connection server unavailable. Retrying...')
+
+    await vi.advanceTimersByTimeAsync(2_000)
+
+    expect(peer.reconnects).toBe(1)
+    expect(sync.status.value).toBe('connecting')
+
+    peer.emit('open')
+
+    expect(sync.status.value).toBe('idle')
+    expect(sync.error.value).toBe('')
 
     sync.stop()
     wrapper.unmount()

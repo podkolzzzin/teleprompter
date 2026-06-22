@@ -14,6 +14,8 @@ const DEVICE_KEY = 'teleprompter-device'
 const KNOWN_DEVICES_KEY = 'teleprompter-known-devices'
 const ACTIVE_SESSION_TTL = 30_000
 const PEERJS_DISABLED = import.meta.env.VITE_DISABLE_PEERJS === 'true'
+const PEER_RECONNECT_BASE_DELAY_MS = 2_000
+const PEER_RECONNECT_MAX_DELAY_MS = 15_000
 
 export interface AccountProfile {
   id: string
@@ -61,12 +63,30 @@ const clock = ref(Date.now())
 let peer: Peer | null = null
 let retryTimer: ReturnType<typeof setInterval> | null = null
 let clockTimer: ReturnType<typeof setInterval> | null = null
+let peerReconnectTimer: ReturnType<typeof setTimeout> | null = null
 let started = false
 let peerReady = false
+let peerReconnectAttempts = 0
 
 const connections = reactive(new Map<string, DataConnection>())
 const pendingDeviceIds = new Set<string>()
 const memoryStorage = new Map<string, string>()
+
+function createPeerOptions() {
+  const host = import.meta.env.VITE_PEERJS_HOST
+  if (!host) return undefined
+
+  const port = Number(import.meta.env.VITE_PEERJS_PORT)
+  const secureEnv = import.meta.env.VITE_PEERJS_SECURE
+
+  return {
+    host,
+    key: import.meta.env.VITE_PEERJS_KEY || 'peerjs',
+    path: import.meta.env.VITE_PEERJS_PATH || '/',
+    ...(Number.isFinite(port) ? { port } : {}),
+    ...(secureEnv ? { secure: secureEnv !== 'false' } : {}),
+  }
+}
 
 function createUuid(): string {
   return crypto.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`
@@ -233,6 +253,54 @@ function refreshConnectedDevices() {
   status.value = pendingDeviceIds.size > 0 || connections.size > 0 || !peerReady ? 'connecting' : 'idle'
 }
 
+function isRecoverablePeerError(err: unknown): boolean {
+  const typed = err as { type?: string; message?: string }
+  return typed.type === 'network'
+    || typed.type === 'socket-error'
+    || typed.type === 'socket-closed'
+    || typed.type === 'disconnected'
+    || typed.message === 'Lost connection to server.'
+}
+
+function reconnectPeer() {
+  peerReconnectTimer = null
+  if (!started || PEERJS_DISABLED) return
+
+  if (!peer || peer.destroyed) {
+    peer = null
+    startPeer()
+    return
+  }
+
+  if (!peer.disconnected) {
+    refreshConnectedDevices()
+    return
+  }
+
+  status.value = 'connecting'
+  try {
+    peer.reconnect()
+  } catch {
+    peer.destroy()
+    peer = null
+    peerReady = false
+    startPeer()
+  }
+}
+
+function schedulePeerReconnect() {
+  if (!started || PEERJS_DISABLED || peerReconnectTimer) return
+  peerReady = false
+  status.value = 'connecting'
+  error.value = 'Connection server unavailable. Retrying...'
+  const delay = Math.min(
+    PEER_RECONNECT_BASE_DELAY_MS * 2 ** peerReconnectAttempts,
+    PEER_RECONNECT_MAX_DELAY_MS,
+  )
+  peerReconnectAttempts += 1
+  peerReconnectTimer = setTimeout(reconnectPeer, delay)
+}
+
 function setupConnection(conn: DataConnection) {
   const remoteId = conn.peer
   const existing = connections.get(remoteId)
@@ -266,10 +334,12 @@ function startPeer() {
   if (!device.value || peer) return
   status.value = 'connecting'
   peerReady = false
-  peer = new Peer(device.value.id)
+  peer = new Peer(device.value.id, createPeerOptions())
 
   peer.on('open', () => {
     peerReady = true
+    peerReconnectAttempts = 0
+    error.value = ''
     refreshConnectedDevices()
     connectPendingDevices()
     connectKnownDevices()
@@ -278,9 +348,15 @@ function startPeer() {
   peer.on('connection', setupConnection)
 
   peer.on('error', (err) => {
+    if (isRecoverablePeerError(err)) {
+      schedulePeerReconnect()
+      return
+    }
     error.value = err.message || 'Account sync failed'
     status.value = 'error'
   })
+
+  peer.on('disconnected', schedulePeerReconnect)
 }
 
 function connectToDevice(deviceId: string) {
@@ -380,14 +456,17 @@ function start() {
 function stop() {
   if (retryTimer) clearInterval(retryTimer)
   if (clockTimer) clearInterval(clockTimer)
+  if (peerReconnectTimer) clearTimeout(peerReconnectTimer)
   for (const conn of connections.values()) conn.close()
   connections.clear()
   pendingDeviceIds.clear()
   peer?.destroy()
   peer = null
   peerReady = false
+  peerReconnectAttempts = 0
   retryTimer = null
   clockTimer = null
+  peerReconnectTimer = null
   started = false
   refreshConnectedDevices()
 }

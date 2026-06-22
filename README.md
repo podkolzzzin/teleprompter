@@ -21,7 +21,7 @@ A Progressive Web App (PWA) teleprompter for reading scripts in the browser. Sup
 - 🔗 **Account Sync** — Pair devices once and keep scripts/settings synchronized automatically
 - 🎯 **Focus Gradient** — Top/bottom dimming with a centre highlight line for easier reading
 - ⌨️ **Keyboard Shortcuts** — Full keyboard control (see table below)
-- 💾 **Local Storage** — All scripts stored in IndexedDB; no server required
+- 💾 **Local Storage** — All scripts stored in IndexedDB; sync and remote control use PeerJS signaling when paired
 - 📱 **Installable PWA** — Works offline and can be added to your home screen
 
 ### Keyboard Shortcuts
@@ -111,6 +111,20 @@ npm run build
 ```bash
 npm run preview
 ```
+
+### PeerJS signaling
+
+Remote control and account sync use PeerJS for WebRTC signaling. By default the app uses PeerJS Cloud. To use a self-hosted PeerServer, set these Vite environment variables before building:
+
+```bash
+VITE_PEERJS_HOST=peer.example.com
+VITE_PEERJS_PORT=443
+VITE_PEERJS_PATH=/
+VITE_PEERJS_KEY=peerjs
+VITE_PEERJS_SECURE=true
+```
+
+For local Playwright runs, `VITE_DISABLE_PEERJS=true` disables real PeerJS network calls.
 
 ## Testing
 
