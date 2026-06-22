@@ -8,6 +8,7 @@ import {
   type DeletedScript,
   type Script,
 } from '../storage/db'
+import { createPeerOptions } from '../utils/peerOptions'
 
 const ACCOUNT_KEY = 'teleprompter-account'
 const DEVICE_KEY = 'teleprompter-device'
@@ -71,22 +72,6 @@ let peerReconnectAttempts = 0
 const connections = reactive(new Map<string, DataConnection>())
 const pendingDeviceIds = new Set<string>()
 const memoryStorage = new Map<string, string>()
-
-function createPeerOptions() {
-  const host = import.meta.env.VITE_PEERJS_HOST
-  if (!host) return undefined
-
-  const port = Number(import.meta.env.VITE_PEERJS_PORT)
-  const secureEnv = import.meta.env.VITE_PEERJS_SECURE
-
-  return {
-    host,
-    key: import.meta.env.VITE_PEERJS_KEY || 'peerjs',
-    path: import.meta.env.VITE_PEERJS_PATH || '/',
-    ...(Number.isFinite(port) ? { port } : {}),
-    ...(secureEnv ? { secure: secureEnv !== 'false' } : {}),
-  }
-}
 
 function createUuid(): string {
   return crypto.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`

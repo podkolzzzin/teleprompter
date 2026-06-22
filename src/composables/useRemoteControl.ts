@@ -1,5 +1,6 @@
 import { ref, onUnmounted } from 'vue'
 import Peer, { type DataConnection } from 'peerjs'
+import { createPeerOptions } from '../utils/peerOptions'
 
 const PEERJS_DISABLED = import.meta.env.VITE_DISABLE_PEERJS === 'true'
 
@@ -42,7 +43,8 @@ export function useRemoteHost(onCommand: (cmd: RemoteCommand) => void) {
   function init() {
     if (PEERJS_DISABLED) return
     if (peer) return
-    peer = new Peer()
+    const options = createPeerOptions()
+    peer = options ? new Peer(options) : new Peer()
 
     peer.on('open', (id) => {
       peerId.value = id
@@ -120,7 +122,8 @@ export function useRemoteClient() {
     }
     connecting.value = true
     error.value = ''
-    peer = new Peer()
+    const options = createPeerOptions()
+    peer = options ? new Peer(options) : new Peer()
 
     peer.on('open', () => {
       conn = peer!.connect(hostId, { reliable: true })

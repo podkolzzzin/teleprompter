@@ -1,0 +1,15 @@
+#:schema node_modules/wrangler/config-schema.json
+name = "teleprompter-peerjs"
+main = "workers/peerjs/index.ts"
+compatibility_date = "2026-06-22"
+
+[vars]
+PEERJS_KEY = "peerjs"
+
+[[durable_objects.bindings]]
+name = "PEER_SERVER"
+class_name = "PeerServer"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["PeerServer"]

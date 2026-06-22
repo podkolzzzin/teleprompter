@@ -126,6 +126,38 @@ VITE_PEERJS_SECURE=true
 
 For local Playwright runs, `VITE_DISABLE_PEERJS=true` disables real PeerJS network calls.
 
+### Cloudflare Worker PeerJS server
+
+This repo includes a PeerJS-compatible signaling Worker at `workers/peerjs/index.ts`. It uses a Durable Object to keep connected peer IDs in one coordination point and supports the PeerJS endpoints used by this app:
+
+- `GET /peerjs/id`
+- `GET /peerjs/peers` returns disabled
+- `WS /peerjs?key=peerjs&id=<peer-id>&token=<token>&version=<peerjs-version>`
+
+Deploy it with:
+
+```bash
+npm run build:worker
+npm run worker:deploy
+```
+
+GitHub Actions deployment is in `.github/workflows/deploy-peerjs-worker.yml` and requires these repository secrets:
+
+```text
+CLOUDFLARE_ACCOUNT_ID
+CLOUDFLARE_API_TOKEN
+```
+
+After the Worker is deployed, point the GitHub Pages build at it with repository variables:
+
+```text
+VITE_PEERJS_HOST=teleprompter-peerjs.<your-workers-subdomain>.workers.dev
+VITE_PEERJS_PORT=443
+VITE_PEERJS_PATH=/
+VITE_PEERJS_KEY=peerjs
+VITE_PEERJS_SECURE=true
+```
+
 ## Testing
 
 Unit tests use [Vitest](https://vitest.dev/) and end-to-end tests use [Playwright](https://playwright.dev/). The dev server is started automatically before E2E tests run. All E2E tests record video (configured in `playwright.config.ts`).
