@@ -157,6 +157,10 @@ Tests run across 3 Playwright projects: Desktop Chrome, Pixel 7 portrait, and Pi
 
 This project ships with the [Playwright MCP](https://github.com/microsoft/playwright-mcp) server so that AI assistants (GitHub Copilot, Claude, etc.) can navigate the app, click buttons, read the DOM, and inspect console logs during development tasks.
 
+### Agent workflow rule
+
+AI agents working in this repository should not create feature branches. Make changes directly on the repository default branch (`main`), run the build and relevant tests, then commit and push to `main` only after those checks pass.
+
 ### VS Code (GitHub Copilot)
 
 The MCP server is pre-configured in `.vscode/mcp.json`. Open the project in VS Code and the Playwright MCP server will be available to Copilot automatically.

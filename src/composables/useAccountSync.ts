@@ -13,6 +13,7 @@ const ACCOUNT_KEY = 'teleprompter-account'
 const DEVICE_KEY = 'teleprompter-device'
 const KNOWN_DEVICES_KEY = 'teleprompter-known-devices'
 const ACTIVE_SESSION_TTL = 30_000
+const PEERJS_DISABLED = import.meta.env.VITE_DISABLE_PEERJS === 'true'
 
 export interface AccountProfile {
   id: string
@@ -352,6 +353,10 @@ function start() {
   if (started) return
   started = true
   ensureProfiles()
+  if (PEERJS_DISABLED) {
+    status.value = 'idle'
+    return
+  }
   startPeer()
   retryTimer = setInterval(retryDeviceConnections, 10_000)
   clockTimer = setInterval(() => {

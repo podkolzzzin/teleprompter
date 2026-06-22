@@ -1,6 +1,8 @@
 import { ref, onUnmounted } from 'vue'
 import Peer, { type DataConnection } from 'peerjs'
 
+const PEERJS_DISABLED = import.meta.env.VITE_DISABLE_PEERJS === 'true'
+
 // ─── Remote-control types (smartphone → teleprompter) ────────────────────────
 
 export interface TeleprompterState {
@@ -38,6 +40,7 @@ export function useRemoteHost(onCommand: (cmd: RemoteCommand) => void) {
   let peer: Peer | null = null
 
   function init() {
+    if (PEERJS_DISABLED) return
     if (peer) return
     peer = new Peer()
 
@@ -111,6 +114,10 @@ export function useRemoteClient() {
   let conn: DataConnection | null = null
 
   function connect(hostId: string) {
+    if (PEERJS_DISABLED) {
+      error.value = 'Remote control is disabled in this test environment'
+      return
+    }
     connecting.value = true
     error.value = ''
     peer = new Peer()

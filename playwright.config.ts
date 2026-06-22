@@ -27,7 +27,7 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'npm run dev',
+    command: 'VITE_DISABLE_PEERJS=true npm run dev',
     url: 'http://localhost:5173',
     reuseExistingServer: !process.env.CI,
   },

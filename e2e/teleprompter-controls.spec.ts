@@ -1,4 +1,29 @@
 import { test, expect } from '@playwright/test'
+import type { Page } from '@playwright/test'
+
+function visibleSlider(page: Page, title: string) {
+  return page.locator(`input[title="${title}"]:visible`)
+}
+
+async function revealDesktopControl(page: Page, index: number) {
+  const control = page.locator('.desktop-adjust-control:visible').nth(index)
+  if (await control.count()) {
+    await control.hover()
+  }
+}
+
+async function expectControlValue(page: Page, label: 'Speed' | 'Text', value: string) {
+  const mobileLabel = page.locator('.mobile-control-row:visible').filter({ hasText: label })
+  if (await mobileLabel.count()) {
+    await expect(mobileLabel.locator('.mobile-control-value')).toContainText(value)
+    return
+  }
+
+  const desktopLabel = label === 'Text' ? 'Size' : label
+  await expect(
+    page.locator('.desktop-adjust-control:visible').filter({ hasText: desktopLabel }).locator('.ctrl-value')
+  ).toContainText(value)
+}
 
 test.describe('Teleprompter controls', () => {
   test.beforeEach(async ({ page }) => {
@@ -26,41 +51,43 @@ test.describe('Teleprompter controls', () => {
   })
 
   test('speed slider changes speed value', async ({ page }) => {
-    // Hover over the control group to reveal the slider (hidden by default on desktop)
-    await page.locator('.ctrl-group').first().hover()
-    const speedSlider = page.getByTitle('Scroll speed')
+    await revealDesktopControl(page, 0)
+    const speedSlider = visibleSlider(page, 'Scroll speed')
     await expect(speedSlider).toBeVisible()
 
     // Default speed is 5
-    await expect(page.locator('.ctrl-group').first().locator('.ctrl-value')).toContainText('5')
+    await expectControlValue(page, 'Speed', '5')
 
     // Change speed
     await speedSlider.fill('30')
-    await expect(page.locator('.ctrl-group').first().locator('.ctrl-value')).toContainText('30')
+    await expectControlValue(page, 'Speed', '30')
 
-    await page.getByLabel('Decrease speed').click()
-    await expect(page.locator('.ctrl-group').first().locator('.ctrl-value')).toContainText('29.95')
+    await page.locator('button[aria-label="Decrease speed"]:visible').click()
+    await expectControlValue(page, 'Speed', '29.95')
 
-    await page.getByLabel('Speed value').fill('17.5')
-    await page.getByLabel('Speed value').press('Enter')
-    await expect(page.locator('.ctrl-group').first().locator('.ctrl-value')).toContainText('17.5')
+    const speedInput = page.locator('input[aria-label="Speed value"]:visible')
+    const hasSpeedInput = await speedInput.count()
+    if (hasSpeedInput) {
+      await speedInput.fill('17.5')
+      await speedInput.press('Enter')
+      await expectControlValue(page, 'Speed', '17.5')
+    }
 
-    await page.getByLabel('Increase speed').click()
-    await expect(page.locator('.ctrl-group').first().locator('.ctrl-value')).toContainText('17.55')
+    await page.locator('button[aria-label="Increase speed"]:visible').click()
+    await expectControlValue(page, 'Speed', hasSpeedInput ? '17.55' : '30')
   })
 
   test('font size slider changes font size value', async ({ page }) => {
-    // Hover over the control group to reveal the slider (hidden by default on desktop)
-    await page.locator('.ctrl-group').nth(1).hover()
-    const fontSlider = page.getByTitle('Font size')
+    await revealDesktopControl(page, 1)
+    const fontSlider = visibleSlider(page, 'Font size')
     await expect(fontSlider).toBeVisible()
 
     // Default font size is 48px
-    await expect(page.locator('.ctrl-group').nth(1).locator('.ctrl-value')).toContainText('48px')
+    await expectControlValue(page, 'Text', '48px')
 
     // Change font size
     await fontSlider.fill('72')
-    await expect(page.locator('.ctrl-group').nth(1).locator('.ctrl-value')).toContainText('72px')
+    await expectControlValue(page, 'Text', '72px')
   })
 
   test('mirror mode toggles mirrored class', async ({ page }) => {

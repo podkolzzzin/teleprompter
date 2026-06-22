@@ -1,5 +1,30 @@
 import { test, expect } from '@playwright/test'
+import type { Page } from '@playwright/test'
 import { waitForVisualScrollOffset } from './helpers/visualScroll'
+
+function visibleSlider(page: Page, title: string) {
+  return page.locator(`input[title="${title}"]:visible`)
+}
+
+async function revealDesktopControl(page: Page, index: number) {
+  const control = page.locator('.desktop-adjust-control:visible').nth(index)
+  if (await control.count()) {
+    await control.hover()
+  }
+}
+
+async function expectReadingControlValue(page: Page, label: 'Speed' | 'Text', value: string) {
+  const mobileRow = page.locator('.mobile-control-row:visible').filter({ hasText: label })
+  if (await mobileRow.count()) {
+    await expect(mobileRow.locator('.mobile-control-value')).toContainText(value)
+    return
+  }
+
+  const desktopLabel = label === 'Text' ? 'Size' : label
+  await expect(
+    page.locator('.desktop-adjust-control:visible').filter({ hasText: desktopLabel }).locator('.ctrl-value')
+  ).toContainText(value)
+}
 
 test.describe('Full teleprompter workflow', () => {
   test('end-to-end: create, preview, edit, teleprompter with all controls', async ({ page }) => {
@@ -84,17 +109,17 @@ test.describe('Full teleprompter workflow', () => {
     await expect(page.locator('.tp-content')).toContainText('Act One: Opening')
 
     // ── 7. Adjust speed to faster ──
-    await page.locator('.ctrl-group').first().hover()
-    const speedSlider = page.getByTitle('Scroll speed')
+    await revealDesktopControl(page, 0)
+    const speedSlider = visibleSlider(page, 'Scroll speed')
     await expect(speedSlider).toBeVisible()
     await speedSlider.fill('10')
-    await expect(page.locator('.ctrl-group').first().locator('.ctrl-value')).toContainText('10')
+    await expectReadingControlValue(page, 'Speed', '10')
 
     // ── 8. Adjust font size larger ──
-    await page.locator('.ctrl-group').nth(1).hover()
-    const fontSlider = page.getByTitle('Font size')
+    await revealDesktopControl(page, 1)
+    const fontSlider = visibleSlider(page, 'Font size')
     await fontSlider.fill('64')
-    await expect(page.locator('.ctrl-group').nth(1).locator('.ctrl-value')).toContainText('64px')
+    await expectReadingControlValue(page, 'Text', '64px')
 
     // ── 9. Start scrolling and watch it progress ──
     await page.getByTitle('Play').click()
@@ -143,12 +168,12 @@ test.describe('Full teleprompter workflow', () => {
     await expect(page.locator('.tp-root')).not.toHaveClass(/controls-hidden/)
 
     // ── 14. Change speed to slow and font to small, then scroll again ──
-    await page.locator('.ctrl-group').first().hover()
+    await revealDesktopControl(page, 0)
     await speedSlider.fill('3')
-    await expect(page.locator('.ctrl-group').first().locator('.ctrl-value')).toContainText('3')
-    await page.locator('.ctrl-group').nth(1).hover()
+    await expectReadingControlValue(page, 'Speed', '3')
+    await revealDesktopControl(page, 1)
     await fontSlider.fill('32')
-    await expect(page.locator('.ctrl-group').nth(1).locator('.ctrl-value')).toContainText('32px')
+    await expectReadingControlValue(page, 'Text', '32px')
 
     await page.getByTitle('Play').click()
     await waitForVisualScrollOffset(page, 250)
@@ -220,8 +245,8 @@ test.describe('Full teleprompter workflow', () => {
     await expect(page.locator('.tp-content')).toContainText('Evening Show')
 
     // Play with adjusted speed
-    await page.locator('.ctrl-group').first().hover()
-    await page.getByTitle('Scroll speed').fill('12')
+    await revealDesktopControl(page, 0)
+    await visibleSlider(page, 'Scroll speed').fill('12')
     await page.getByTitle('Play').click()
     await waitForVisualScrollOffset(page, 80)
     await page.getByTitle('Pause').click()
