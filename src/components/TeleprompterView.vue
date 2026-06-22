@@ -48,7 +48,14 @@
     </div>
 
     <!-- Controls overlay -->
-    <div class="controls" @click.stop>
+    <div
+      class="controls"
+      @click.stop
+      @touchstart.passive="onControlsTouchStart"
+      @touchmove.passive="onControlsTouchMove"
+      @touchend.passive="onControlsTouchEnd"
+      @touchcancel.passive="onControlsTouchCancel"
+    >
       <!-- Timeline progress bar -->
       <ScrollTimeline :progress="scrollProgress" :timeLeft="timeLeft" @seek="onTimelineSeek" />
 
@@ -163,24 +170,26 @@
       </div>
 
       <div class="controls-inner">
-        <button class="ctrl-btn back-btn" @click="router.push('/')" title="Back">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
-        </button>
+        <div class="control-action-group playback-actions">
+          <button class="ctrl-btn back-btn" @click="router.push('/')" title="Back">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+          </button>
 
-        <button class="ctrl-btn play-btn" @click="togglePlay" :title="playing ? 'Pause' : 'Play'">
-          <svg v-if="!playing" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M6 4l14 8-14 8V4z"/></svg>
-          <svg v-else viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><rect x="5" y="3" width="4" height="18" rx="1"/><rect x="15" y="3" width="4" height="18" rx="1"/></svg>
-        </button>
+          <button class="ctrl-btn play-btn" @click="togglePlay" :title="playing ? 'Pause' : 'Play'">
+            <svg v-if="!playing" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M6 4l14 8-14 8V4z"/></svg>
+            <svg v-else viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><rect x="5" y="3" width="4" height="18" rx="1"/><rect x="15" y="3" width="4" height="18" rx="1"/></svg>
+          </button>
 
-        <button
-          v-if="voiceSyncSupported"
-          class="ctrl-btn icon-btn mic-btn"
-          :class="{ active: isVoiceSyncActive, listening: voiceSyncListening }"
-          @click="toggleVoiceSync"
-          title="Voice sync (V)"
-        >
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 00-3 3v7a3 3 0 006 0V5a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg>
-        </button>
+          <button
+            v-if="voiceSyncSupported"
+            class="ctrl-btn icon-btn mic-btn"
+            :class="{ active: isVoiceSyncActive, listening: voiceSyncListening }"
+            @click="toggleVoiceSync"
+            title="Voice sync (V)"
+          >
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 00-3 3v7a3 3 0 006 0V5a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg>
+          </button>
+        </div>
 
         <div
           class="ctrl-group speed-control desktop-adjust-control"
@@ -274,60 +283,64 @@
 
         <span class="ctrl-separator" aria-hidden="true"></span>
 
-        <button
-          class="ctrl-btn icon-btn"
-          :class="{ active: editingFrame }"
-          @click="toggleFrameEdit"
-          title="Edit prompter frame (F)"
-        >
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8V4h4"/><path d="M16 4h4v4"/><path d="M20 16v4h-4"/><path d="M8 20H4v-4"/></svg>
-        </button>
+        <div class="control-action-group view-actions">
+          <button
+            class="ctrl-btn icon-btn"
+            :class="{ active: editingFrame }"
+            @click="toggleFrameEdit"
+            title="Edit prompter frame (F)"
+          >
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8V4h4"/><path d="M16 4h4v4"/><path d="M20 16v4h-4"/><path d="M8 20H4v-4"/></svg>
+          </button>
 
-        <button
-          class="ctrl-btn icon-btn"
-          :class="{ active: mirror }"
-          @click="mirror = !mirror"
-          title="Mirror mode (M)"
-        >
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 16V8l-4 4z"/><path d="M17 8v8l4-4z"/><path d="M12 3v18"/></svg>
-        </button>
+          <button
+            class="ctrl-btn icon-btn"
+            :class="{ active: mirror }"
+            @click="mirror = !mirror"
+            title="Mirror mode (M)"
+          >
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 16V8l-4 4z"/><path d="M17 8v8l4-4z"/><path d="M12 3v18"/></svg>
+          </button>
 
-        <button
-          class="ctrl-btn icon-btn flip-vertical-btn"
-          :class="{ active: flipVertically }"
-          @click="flipVertically = !flipVertically"
-          title="Flip vertically"
-        >
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 7h8l-4-4z"/><path d="M16 17H8l4 4z"/><path d="M3 12h18"/></svg>
-        </button>
+          <button
+            class="ctrl-btn icon-btn flip-vertical-btn"
+            :class="{ active: flipVertically }"
+            @click="flipVertically = !flipVertically"
+            title="Flip vertically"
+          >
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 7h8l-4-4z"/><path d="M16 17H8l4 4z"/><path d="M3 12h18"/></svg>
+          </button>
 
-        <OrientationControl v-model="orientation" @update:model-value="setOrientation" />
+          <OrientationControl v-model="orientation" @update:model-value="setOrientation" />
+        </div>
 
         <span class="ctrl-separator" aria-hidden="true"></span>
 
-        <button
-          class="ctrl-btn icon-btn fullscreen-btn"
-          :class="{ active: isFullscreen }"
-          @click="toggleFullscreen"
-          :title="isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'"
-        >
-          <svg v-if="!isFullscreen" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 00-2 2v3"/><path d="M21 8V5a2 2 0 00-2-2h-3"/><path d="M3 16v3a2 2 0 002 2h3"/><path d="M16 21h3a2 2 0 002-2v-3"/></svg>
-          <svg v-else viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v3a2 2 0 01-2 2H3"/><path d="M21 8h-3a2 2 0 01-2-2V3"/><path d="M3 16h3a2 2 0 012 2v3"/><path d="M16 21v-3a2 2 0 012-2h3"/></svg>
-        </button>
+        <div class="control-action-group session-actions">
+          <button
+            class="ctrl-btn icon-btn fullscreen-btn"
+            :class="{ active: isFullscreen }"
+            @click="toggleFullscreen"
+            :title="isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'"
+          >
+            <svg v-if="!isFullscreen" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 00-2 2v3"/><path d="M21 8V5a2 2 0 00-2-2h-3"/><path d="M3 16v3a2 2 0 002 2h3"/><path d="M16 21h3a2 2 0 002-2v-3"/></svg>
+            <svg v-else viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v3a2 2 0 01-2 2H3"/><path d="M21 8h-3a2 2 0 01-2-2V3"/><path d="M3 16h3a2 2 0 012 2v3"/><path d="M16 21v-3a2 2 0 012-2h3"/></svg>
+          </button>
 
-        <!-- Remote control share button -->
-        <button
-          class="ctrl-btn icon-btn share-btn"
-          :class="{ active: remoteConnected }"
-          @click="openShareModal"
-          title="Remote control"
-        >
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
-        </button>
+          <!-- Remote control share button -->
+          <button
+            class="ctrl-btn icon-btn share-btn"
+            :class="{ active: remoteConnected }"
+            @click="openShareModal"
+            title="Remote control"
+          >
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+          </button>
 
-        <button class="ctrl-btn icon-btn hide-btn" @click="controlsHidden = !controlsHidden" title="Toggle controls">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg>
-        </button>
+          <button class="ctrl-btn icon-btn hide-btn" @click="controlsHidden = !controlsHidden" title="Toggle controls">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg>
+          </button>
+        </div>
       </div>
     </div>
 
@@ -410,6 +423,8 @@ interface TeleprompterPageState {
 }
 
 let restoringPageState = false
+let controlsTouchStartY: number | null = null
+let controlsTouchLastY: number | null = null
 
 const rootEl = ref<HTMLElement | null>(null)
 const scrollEl = ref<HTMLElement | null>(null)
@@ -898,6 +913,37 @@ function onScrollClick() {
   if (!editingFrame.value) togglePlay()
 }
 
+function onControlsTouchStart(event: TouchEvent) {
+  const touch = event.touches[0]
+  if (!touch) return
+  controlsTouchStartY = touch.clientY
+  controlsTouchLastY = touch.clientY
+}
+
+function onControlsTouchMove(event: TouchEvent) {
+  const touch = event.touches[0]
+  if (!touch || controlsTouchStartY === null) return
+  controlsTouchLastY = touch.clientY
+}
+
+function onControlsTouchEnd() {
+  if (controlsTouchStartY === null || controlsTouchLastY === null) {
+    onControlsTouchCancel()
+    return
+  }
+
+  const deltaY = controlsTouchLastY - controlsTouchStartY
+  if (Math.abs(deltaY) >= 40) {
+    controlsHidden.value = deltaY > 0
+  }
+  onControlsTouchCancel()
+}
+
+function onControlsTouchCancel() {
+  controlsTouchStartY = null
+  controlsTouchLastY = null
+}
+
 // Frame drag/resize
 type FrameAction = 'move' | 'resize-left' | 'resize-right'
 let frameAction: FrameAction | null = null
@@ -1141,6 +1187,10 @@ function positionPopup(e: Event) {
 
 .controls-inner::-webkit-scrollbar {
   display: none;
+}
+
+.control-action-group {
+  display: contents;
 }
 
 .mobile-adjustments {
@@ -1719,11 +1769,28 @@ function positionPopup(e: Event) {
   .tp-root.is-playing.controls-hidden .controls {
     opacity: 1;
     transform: none;
-    pointer-events: none;
+    pointer-events: auto;
   }
   .tp-root.is-playing.controls-hidden .controls :deep(.scroll-timeline),
   .tp-root.is-playing.controls-hidden .play-btn {
     pointer-events: auto;
+  }
+  .tp-root.is-playing.controls-hidden .mobile-adjustments,
+  .tp-root.is-playing.controls-hidden .view-actions,
+  .tp-root.is-playing.controls-hidden .session-actions {
+    display: none;
+  }
+  .tp-root.is-playing.controls-hidden .controls-inner {
+    display: flex;
+    justify-content: center;
+  }
+  .tp-root.is-playing.controls-hidden .playback-actions {
+    display: flex;
+    width: auto;
+    justify-content: center;
+  }
+  .tp-root.is-playing.controls-hidden .playback-actions > :not(.play-btn) {
+    display: none;
   }
   .tp-root.is-playing.controls-hidden .show-controls-btn {
     display: none;
@@ -1836,19 +1903,46 @@ function positionPopup(e: Event) {
     display: none;
   }
   .controls-inner {
-    display: flex;
-    align-items: center;
-    gap: 3px;
-    justify-content: stretch;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: stretch;
+    column-gap: 14px;
+    row-gap: 7px;
+    justify-content: center;
     overflow: visible;
   }
-  .controls-inner > * {
-    flex: 1 1 0;
+  .control-action-group {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-width: 0;
+  }
+  .playback-actions,
+  .session-actions {
+    grid-row: 1;
+  }
+  .playback-actions {
+    grid-column: 1;
+  }
+  .session-actions {
+    grid-column: 2;
+  }
+  .view-actions {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+  .controls-inner > .ctrl-separator {
+    display: none;
+  }
+  .control-action-group > * {
+    flex: 0 0 40px;
     min-width: 0;
   }
   .ctrl-btn {
-    width: 100%;
+    width: 40px;
     min-width: 0;
+    height: 40px;
     min-height: 40px;
     padding: 7px 4px;
   }
@@ -1858,14 +1952,18 @@ function positionPopup(e: Event) {
   }
   .play-btn {
     min-width: 0;
+    width: 44px;
+    height: 44px;
     min-height: 44px;
   }
   .controls-inner :deep(.orientation-control) {
+    flex-basis: 40px;
     min-width: 0;
   }
   .controls-inner :deep(.orientation-trigger) {
-    width: 100%;
+    width: 40px;
     min-width: 0;
+    height: 40px;
     min-height: 40px;
     padding: 7px 4px;
   }
@@ -1882,9 +1980,6 @@ function positionPopup(e: Event) {
   }
   .ctrl-value {
     font-size: 11px;
-  }
-  .ctrl-separator {
-    display: none;
   }
   .ctrl-slider {
     width: 100px;

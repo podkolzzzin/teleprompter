@@ -704,6 +704,40 @@ describe('TeleprompterView', () => {
     expect(wrapper.find('.hide-btn').exists()).toBe(true)
   })
 
+  it('hides and shows controls with a vertical touch drag', async () => {
+    vi.mocked(getScript).mockResolvedValue({
+      id: 1,
+      title: 'Test',
+      content: 'Content',
+      createdAt: 1000,
+      updatedAt: 1000,
+    })
+
+    const router = createTestRouter()
+    await router.isReady()
+
+    const wrapper = mount(TeleprompterView, {
+      global: { plugins: [router] },
+    })
+
+    await vi.waitFor(() => {
+      expect(wrapper.find('.loading').exists()).toBe(false)
+    })
+
+    const controls = wrapper.find('.controls')
+    await controls.trigger('touchstart', { touches: [{ clientY: 100 }] })
+    await controls.trigger('touchmove', { touches: [{ clientY: 160 }] })
+    await controls.trigger('touchend')
+
+    expect(wrapper.find('.tp-root').classes()).toContain('controls-hidden')
+
+    await controls.trigger('touchstart', { touches: [{ clientY: 160 }] })
+    await controls.trigger('touchmove', { touches: [{ clientY: 90 }] })
+    await controls.trigger('touchend')
+
+    expect(wrapper.find('.tp-root').classes()).not.toContain('controls-hidden')
+  })
+
   it('restores latest teleprompter page state after reload', async () => {
     const originalScrollHeight = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollHeight')
     const originalClientHeight = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientHeight')
