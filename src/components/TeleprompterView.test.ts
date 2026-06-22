@@ -673,7 +673,7 @@ describe('TeleprompterView', () => {
     }
   })
 
-  it('marks the teleprompter as playing so mobile controls can collapse', async () => {
+  it('keeps mobile action buttons available while playing', async () => {
     vi.mocked(getScript).mockResolvedValue({
       id: 1,
       title: 'Test',
@@ -697,6 +697,11 @@ describe('TeleprompterView', () => {
     await wrapper.find('.play-btn').trigger('click')
 
     expect(wrapper.find('.tp-root').classes()).toContain('is-playing')
+    expect(wrapper.find('.back-btn').exists()).toBe(true)
+    expect(wrapper.find('.flip-vertical-btn').exists()).toBe(true)
+    expect(wrapper.find('.fullscreen-btn').exists()).toBe(true)
+    expect(wrapper.find('.share-btn').exists()).toBe(true)
+    expect(wrapper.find('.hide-btn').exists()).toBe(true)
   })
 
   it('restores latest teleprompter page state after reload', async () => {

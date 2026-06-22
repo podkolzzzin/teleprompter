@@ -1714,11 +1714,7 @@ function positionPopup(e: Event) {
     display: none;
   }
   .tp-root.is-playing .controls-inner {
-    justify-content: center;
-    overflow: visible;
-  }
-  .tp-root.is-playing .controls-inner > :not(.play-btn) {
-    display: none;
+    display: grid;
   }
   .tp-root.is-playing.controls-hidden .controls {
     opacity: 1;
@@ -1840,21 +1836,41 @@ function positionPopup(e: Event) {
     display: none;
   }
   .controls-inner {
-    gap: 2px;
-    justify-content: flex-start;
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    justify-content: stretch;
+    overflow: visible;
+  }
+  .controls-inner > * {
+    flex: 1 1 0;
+    min-width: 0;
   }
   .ctrl-btn {
-    min-width: 44px;
-    min-height: 44px;
-    padding: 8px;
+    width: 100%;
+    min-width: 0;
+    min-height: 40px;
+    padding: 7px 4px;
   }
   .ctrl-btn.icon-btn {
-    min-width: 44px;
-    min-height: 44px;
+    min-width: 0;
+    min-height: 40px;
   }
   .play-btn {
-    min-width: 48px;
-    min-height: 48px;
+    min-width: 0;
+    min-height: 44px;
+  }
+  .controls-inner :deep(.orientation-control) {
+    min-width: 0;
+  }
+  .controls-inner :deep(.orientation-trigger) {
+    width: 100%;
+    min-width: 0;
+    min-height: 40px;
+    padding: 7px 4px;
+  }
+  .controls-inner :deep(.orientation-value) {
+    display: none;
   }
   .ctrl-group {
     padding: 4px 6px;
