@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount as baseMount, type VueWrapper } from '@vue/test-utils'
 import { createRouter, createWebHistory } from 'vue-router'
+import { nextTick } from 'vue'
 import TeleprompterView from './TeleprompterView.vue'
 import { resetTeleprompterSettingsForTest } from '../composables/useTeleprompterSettings'
 
@@ -627,6 +628,75 @@ describe('TeleprompterView', () => {
     })
 
     expect(wrapper.find('.tl-elapsed').text()).toBe('0%')
+  })
+
+  it('keeps restored text frame inside the viewport', async () => {
+    const originalClientWidth = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientWidth')
+
+    try {
+      Object.defineProperty(HTMLElement.prototype, 'clientWidth', {
+        configurable: true,
+        get() {
+          return this.classList?.contains('tp-root') ? 360 : 0
+        },
+      })
+
+      vi.mocked(getScript).mockResolvedValue({
+        id: 1,
+        title: 'Test',
+        content: 'Content',
+        createdAt: 1000,
+        updatedAt: 1000,
+      })
+
+      const router = createTestRouter()
+      await router.isReady()
+
+      const wrapper = mount(TeleprompterView, {
+        global: { plugins: [router] },
+      })
+
+      await vi.waitFor(() => {
+        expect(wrapper.find('.loading').exists()).toBe(false)
+      })
+      await nextTick()
+
+      const contentStyle = wrapper.find('.tp-content').attributes('style')
+      expect(contentStyle).toContain('max-width: 360px')
+      expect(contentStyle).toContain('margin-left: calc(50% - 180px)')
+    } finally {
+      if (originalClientWidth) {
+        Object.defineProperty(HTMLElement.prototype, 'clientWidth', originalClientWidth)
+      } else {
+        Reflect.deleteProperty(HTMLElement.prototype, 'clientWidth')
+      }
+    }
+  })
+
+  it('marks the teleprompter as playing so mobile controls can collapse', async () => {
+    vi.mocked(getScript).mockResolvedValue({
+      id: 1,
+      title: 'Test',
+      content: 'Content',
+      createdAt: 1000,
+      updatedAt: 1000,
+    })
+
+    const router = createTestRouter()
+    await router.isReady()
+
+    const wrapper = mount(TeleprompterView, {
+      global: { plugins: [router] },
+    })
+
+    await vi.waitFor(() => {
+      expect(wrapper.find('.loading').exists()).toBe(false)
+    })
+
+    expect(wrapper.find('.tp-root').classes()).not.toContain('is-playing')
+    await wrapper.find('.play-btn').trigger('click')
+
+    expect(wrapper.find('.tp-root').classes()).toContain('is-playing')
   })
 
   it('restores latest teleprompter page state after reload', async () => {

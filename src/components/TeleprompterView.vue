@@ -6,6 +6,7 @@
       mirrored: mirror,
       'flipped-vertically': flipVertically,
       'controls-hidden': controlsHidden,
+      'is-playing': playing,
       [orientationClass]: orientationClass,
     }"
   >
@@ -802,6 +803,7 @@ onMounted(async () => {
         restoringPageState = true
         controlsHidden.value = pageState?.controlsHidden ?? controlsHidden.value
         flipVertically.value = pageState?.flipVertically ?? flipVertically.value
+        clampFrameToViewport()
         const savedProgress = pageState?.scrollProgress ?? script.scrollProgress ?? 0
         setScrollOffset(clampProgress(savedProgress) * getMaxScrollDistance())
         shouldResumePlaying = pageState?.playing === true
@@ -818,6 +820,9 @@ onMounted(async () => {
   activeSessionTimer = setInterval(publishCurrentActiveSession, 2_000)
   window.addEventListener('keydown', handleKey)
   window.addEventListener('beforeunload', persistPageState)
+  window.addEventListener('resize', clampFrameToViewport)
+  window.addEventListener('orientationchange', clampFrameToViewport)
+  window.visualViewport?.addEventListener('resize', clampFrameToViewport)
   scrollEl.value?.addEventListener('scroll', onScroll, { passive: true })
   if (shouldResumePlaying) startScroll()
 })
@@ -843,6 +848,8 @@ onUnmounted(() => {
   window.removeEventListener('keydown', handleKey)
   window.removeEventListener('beforeunload', persistPageState)
   window.removeEventListener('resize', clampFrameToViewport)
+  window.removeEventListener('orientationchange', clampFrameToViewport)
+  window.visualViewport?.removeEventListener('resize', clampFrameToViewport)
   document.removeEventListener('pointermove', onFramePointerMove)
   document.removeEventListener('pointerup', onFramePointerUp)
 })
@@ -903,8 +910,20 @@ function clamp(value: number, min: number, max: number) {
 }
 
 function clampOffset(offset: number, width: number) {
-  const maxOffset = Math.max(0, (window.innerWidth - width) / 2)
+  const maxOffset = Math.max(0, (getFrameViewportWidth() - width) / 2)
   return clamp(offset, -maxOffset, maxOffset)
+}
+
+function getFrameViewportWidth(): number {
+  return rootEl.value?.clientWidth || window.visualViewport?.width || window.innerWidth
+}
+
+function getMinFrameWidth(viewportWidth = getFrameViewportWidth()): number {
+  return Math.min(300, viewportWidth)
+}
+
+function clampFrameWidth(width: number, viewportWidth = getFrameViewportWidth(), minFrameWidth = getMinFrameWidth(viewportWidth)) {
+  return clamp(width, minFrameWidth, viewportWidth)
 }
 
 function onFramePointerDown(action: FrameAction, e: PointerEvent) {
@@ -919,15 +938,17 @@ function onFramePointerDown(action: FrameAction, e: PointerEvent) {
 function onFramePointerMove(e: PointerEvent) {
   if (!frameAction) return
   const dx = (e.clientX - frameStartX) * (mirror.value ? -1 : 1)
+  const viewportWidth = getFrameViewportWidth()
+  const minFrameWidth = getMinFrameWidth(viewportWidth)
 
   if (frameAction === 'move') {
     areaOffsetX.value = clampOffset(frameStartOffsetX + dx, areaWidth.value)
   } else if (frameAction === 'resize-left') {
-    const newWidth = clamp(frameStartWidth - dx, 300, window.innerWidth)
+    const newWidth = clampFrameWidth(frameStartWidth - dx, viewportWidth, minFrameWidth)
     areaWidth.value = newWidth
     areaOffsetX.value = clampOffset(frameStartOffsetX + (frameStartWidth - newWidth) / 2, newWidth)
   } else if (frameAction === 'resize-right') {
-    const newWidth = clamp(frameStartWidth + dx, 300, window.innerWidth)
+    const newWidth = clampFrameWidth(frameStartWidth + dx, viewportWidth, minFrameWidth)
     areaWidth.value = newWidth
     areaOffsetX.value = clampOffset(frameStartOffsetX + (newWidth - frameStartWidth) / 2, newWidth)
   }
@@ -941,10 +962,7 @@ function onFramePointerUp() {
 
 function toggleFrameEdit() {
   editingFrame.value = !editingFrame.value
-  if (editingFrame.value && areaWidth.value > window.innerWidth) {
-    areaWidth.value = window.innerWidth
-    areaOffsetX.value = clampOffset(areaOffsetX.value, areaWidth.value)
-  }
+  if (editingFrame.value) clampFrameToViewport()
 }
 
 // Recalculate remaining time immediately when speed changes.
@@ -956,24 +974,21 @@ watch(speed, () => {
   updateTimelineProgress()
 })
 
-// When frame editing starts, clamp frame width to viewport so handles are visible.
-// Also re-clamp on viewport resize (e.g. device rotation) while editing is active.
+// Keep the reading frame inside the visible teleprompter viewport after reload,
+// rotation, manual resize, and frame editing.
 function clampFrameToViewport() {
-  const vw = window.innerWidth
-  if (areaWidth.value > vw) {
-    areaWidth.value = vw
-    areaOffsetX.value = clampOffset(areaOffsetX.value, vw)
-  }
+  const viewportWidth = getFrameViewportWidth()
+  areaWidth.value = clampFrameWidth(areaWidth.value, viewportWidth)
+  areaOffsetX.value = clampOffset(areaOffsetX.value, areaWidth.value)
 }
 
 watch(editingFrame, (isEditing) => {
   if (isEditing) {
     clampFrameToViewport()
-    window.addEventListener('resize', clampFrameToViewport)
-  } else {
-    window.removeEventListener('resize', clampFrameToViewport)
   }
 })
+
+watch([areaWidth, areaOffsetX, orientation], clampFrameToViewport, { flush: 'post' })
 
 // Position the slider popup using fixed coordinates so it escapes the
 // overflow-x:auto scroll container (.controls-inner).
@@ -1075,6 +1090,8 @@ function positionPopup(e: Event) {
 }
 
 .tp-content {
+  box-sizing: border-box;
+  width: 100%;
   padding: 32px 48px 0;
   max-width: 900px;
   margin: 0 auto;
@@ -1689,6 +1706,31 @@ function positionPopup(e: Event) {
   }
   .controls :deep(.scroll-timeline) {
     margin-bottom: 10px;
+  }
+  .tp-root.is-playing .controls {
+    padding-top: 8px;
+  }
+  .tp-root.is-playing .mobile-adjustments {
+    display: none;
+  }
+  .tp-root.is-playing .controls-inner {
+    justify-content: center;
+    overflow: visible;
+  }
+  .tp-root.is-playing .controls-inner > :not(.play-btn) {
+    display: none;
+  }
+  .tp-root.is-playing.controls-hidden .controls {
+    opacity: 1;
+    transform: none;
+    pointer-events: none;
+  }
+  .tp-root.is-playing.controls-hidden .controls :deep(.scroll-timeline),
+  .tp-root.is-playing.controls-hidden .play-btn {
+    pointer-events: auto;
+  }
+  .tp-root.is-playing.controls-hidden .show-controls-btn {
+    display: none;
   }
   .mobile-adjustments {
     display: grid;
