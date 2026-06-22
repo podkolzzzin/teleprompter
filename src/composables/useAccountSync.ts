@@ -284,9 +284,11 @@ function startPeer() {
 }
 
 function connectToDevice(deviceId: string) {
+  ensureProfiles()
   if (!device.value || deviceId === device.value.id || connections.has(deviceId)) return
   pendingDeviceIds.add(deviceId)
   refreshConnectedDevices()
+  startPeerSync()
   connectPendingDevices()
 }
 
@@ -313,6 +315,7 @@ function retryDeviceConnections() {
 const localActiveSession = ref<ActiveSession | null>(null)
 
 async function syncNow() {
+  if (connections.size === 0 && knownDevices.value.length > 0) startPeerSync()
   if (connections.size === 0) return
   broadcast({
     type: 'account:scripts',
@@ -322,6 +325,7 @@ async function syncNow() {
 }
 
 function publishActiveSession(session: Omit<ActiveSession, 'deviceId' | 'updatedAt'> | null) {
+  if (session && connections.size === 0 && knownDevices.value.length > 0) startPeerSync()
   const nextSession = session && device.value
     ? { ...session, deviceId: device.value.id, updatedAt: Date.now() }
     : null
@@ -342,6 +346,7 @@ const pairUrl = computed(() => {
 })
 
 function openPairing() {
+  startPeerSync()
   pairingOpen.value = true
 }
 
@@ -349,7 +354,11 @@ function closePairing() {
   pairingOpen.value = false
 }
 
-function start() {
+function initializeProfiles() {
+  ensureProfiles()
+}
+
+function startPeerSync() {
   if (started) return
   started = true
   ensureProfiles()
@@ -362,6 +371,10 @@ function start() {
   clockTimer = setInterval(() => {
     clock.value = Date.now()
   }, 1_000)
+}
+
+function start() {
+  startPeerSync()
 }
 
 function stop() {
@@ -380,7 +393,7 @@ function stop() {
 }
 
 export function useAccountSync() {
-  onMounted(start)
+  onMounted(initializeProfiles)
   onUnmounted(() => {
     // The singleton is intentionally kept alive across route components.
   })

@@ -116,10 +116,12 @@ describe('useAccountSync', () => {
     const wrapper = mount(Harness)
     await nextTick()
 
-    expect(peerState.instances).toHaveLength(1)
-    const peer = peerState.instances[0]
+    expect(peerState.instances).toHaveLength(0)
 
     sync.connectToDevice('target-device')
+
+    expect(peerState.instances).toHaveLength(1)
+    const peer = peerState.instances[0]
 
     expect(sync.status.value).toBe('connecting')
     expect(sync.connectedDeviceIds.value).toEqual([])
@@ -137,6 +139,31 @@ describe('useAccountSync', () => {
     expect(sync.connectedDeviceIds.value).toEqual(['target-device'])
     expect(sync.status.value).toBe('online')
     expect(peer.connections[0].sent[0]).toMatchObject({ type: 'account:hello' })
+
+    sync.stop()
+    wrapper.unmount()
+  })
+
+  it('starts PeerJS only when account pairing is opened', async () => {
+    let sync!: ReturnType<typeof useAccountSync>
+
+    const Harness = defineComponent({
+      setup() {
+        sync = useAccountSync()
+        return () => h('div')
+      },
+    })
+
+    const wrapper = mount(Harness)
+    await nextTick()
+
+    expect(sync.pairUrl.value).toContain('/account/tp-')
+    expect(peerState.instances).toHaveLength(0)
+
+    sync.openPairing()
+
+    expect(sync.pairingOpen.value).toBe(true)
+    expect(peerState.instances).toHaveLength(1)
 
     sync.stop()
     wrapper.unmount()
