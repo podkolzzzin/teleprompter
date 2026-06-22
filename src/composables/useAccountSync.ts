@@ -61,8 +61,10 @@ let peer: Peer | null = null
 let retryTimer: ReturnType<typeof setInterval> | null = null
 let clockTimer: ReturnType<typeof setInterval> | null = null
 let started = false
+let peerReady = false
 
 const connections = reactive(new Map<string, DataConnection>())
+const pendingDeviceIds = new Set<string>()
 const memoryStorage = new Map<string, string>()
 
 function createUuid(): string {
@@ -213,8 +215,21 @@ async function handlePayload(payload: SyncPayload, conn: DataConnection) {
 }
 
 function refreshConnectedDevices() {
-  connectedDeviceIds.value = [...connections.keys()]
-  status.value = connectedDeviceIds.value.length > 0 ? 'online' : 'idle'
+  connectedDeviceIds.value = [...connections.entries()]
+    .filter(([, conn]) => conn.open)
+    .map(([deviceId]) => deviceId)
+
+  if (connectedDeviceIds.value.length > 0) {
+    status.value = 'online'
+    return
+  }
+
+  if (!started && !peer) {
+    status.value = 'idle'
+    return
+  }
+
+  status.value = pendingDeviceIds.size > 0 || connections.size > 0 || !peerReady ? 'connecting' : 'idle'
 }
 
 function setupConnection(conn: DataConnection) {
@@ -225,6 +240,8 @@ function setupConnection(conn: DataConnection) {
   refreshConnectedDevices()
 
   conn.on('open', async () => {
+    pendingDeviceIds.delete(remoteId)
+    error.value = ''
     refreshConnectedDevices()
     sendTo(conn, await buildHello())
   })
@@ -247,10 +264,13 @@ function setupConnection(conn: DataConnection) {
 function startPeer() {
   if (!device.value || peer) return
   status.value = 'connecting'
+  peerReady = false
   peer = new Peer(device.value.id)
 
   peer.on('open', () => {
-    status.value = 'idle'
+    peerReady = true
+    refreshConnectedDevices()
+    connectPendingDevices()
     connectKnownDevices()
   })
 
@@ -263,15 +283,30 @@ function startPeer() {
 }
 
 function connectToDevice(deviceId: string) {
-  if (!peer || !device.value || deviceId === device.value.id || connections.has(deviceId)) return
-  const conn = peer.connect(deviceId, { reliable: true })
-  setupConnection(conn)
+  if (!device.value || deviceId === device.value.id || connections.has(deviceId)) return
+  pendingDeviceIds.add(deviceId)
+  refreshConnectedDevices()
+  connectPendingDevices()
+}
+
+function connectPendingDevices() {
+  if (!peer || !peerReady || !device.value) return
+  for (const deviceId of pendingDeviceIds) {
+    if (deviceId === device.value.id || connections.has(deviceId)) continue
+    const conn = peer.connect(deviceId, { reliable: true })
+    setupConnection(conn)
+  }
 }
 
 function connectKnownDevices() {
   for (const known of knownDevices.value) {
     connectToDevice(known.id)
   }
+}
+
+function retryDeviceConnections() {
+  connectPendingDevices()
+  connectKnownDevices()
 }
 
 const localActiveSession = ref<ActiveSession | null>(null)
@@ -318,7 +353,7 @@ function start() {
   started = true
   ensureProfiles()
   startPeer()
-  retryTimer = setInterval(connectKnownDevices, 10_000)
+  retryTimer = setInterval(retryDeviceConnections, 10_000)
   clockTimer = setInterval(() => {
     clock.value = Date.now()
   }, 1_000)
@@ -329,8 +364,10 @@ function stop() {
   if (clockTimer) clearInterval(clockTimer)
   for (const conn of connections.values()) conn.close()
   connections.clear()
+  pendingDeviceIds.clear()
   peer?.destroy()
   peer = null
+  peerReady = false
   retryTimer = null
   clockTimer = null
   started = false
