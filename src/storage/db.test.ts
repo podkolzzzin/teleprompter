@@ -4,17 +4,31 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 const mockStore = new Map<number, unknown>()
 let autoId = 0
 
+function hasDuplicateUuid(value: Record<string, unknown>, ignoredId?: number) {
+  if (!value.uuid) return false
+  return [...mockStore.values()].some((existing) => {
+    const script = existing as Record<string, unknown>
+    return script.id !== ignoredId && script.uuid === value.uuid
+  })
+}
+
 vi.mock('idb', () => ({
   openDB: vi.fn(() =>
     Promise.resolve({
       getAll: vi.fn((_store: string) => Promise.resolve([...mockStore.values()])),
       get: vi.fn((_store: string, id: number) => Promise.resolve(mockStore.get(id))),
-      add: vi.fn((_store: string, value: unknown) => {
+      add: vi.fn((_store: string, value: Record<string, unknown>) => {
+        if (hasDuplicateUuid(value)) {
+          return Promise.reject(new DOMException('Constraint failed', 'ConstraintError'))
+        }
         autoId++
-        mockStore.set(autoId, { ...(value as Record<string, unknown>), id: autoId })
+        mockStore.set(autoId, { ...value, id: autoId })
         return Promise.resolve(autoId)
       }),
       put: vi.fn((_store: string, value: Record<string, unknown>) => {
+        if (hasDuplicateUuid(value, value.id as number | undefined)) {
+          return Promise.reject(new DOMException('Constraint failed', 'ConstraintError'))
+        }
         mockStore.set(value.id as number, value)
         return Promise.resolve()
       }),
@@ -26,7 +40,15 @@ vi.mock('idb', () => ({
   ),
 }))
 
-import { getAllScripts, getScript, saveScript, updateScript, deleteScript, updateScrollProgress } from './db'
+import {
+  deleteScript,
+  getAllScripts,
+  getScript,
+  saveScript,
+  updateScript,
+  updateScrollProgress,
+  upsertSyncedScripts,
+} from './db'
 
 describe('storage/db', () => {
   beforeEach(() => {
@@ -133,6 +155,26 @@ describe('storage/db', () => {
       expect(script!.createdAt).toBe(100)
       expect(script!.updatedAt).toBe(200)
       expect(script!.scrollProgress).toBe(0.75)
+    })
+  })
+
+  describe('upsertSyncedScripts', () => {
+    it('deduplicates incoming scripts by uuid before inserting', async () => {
+      const changed = await upsertSyncedScripts([
+        { uuid: 'same-script', title: 'Older', content: 'old', createdAt: 1, updatedAt: 1 },
+        { uuid: 'same-script', title: 'Newer', content: 'new', createdAt: 1, updatedAt: 2 },
+      ])
+
+      const scripts = await getAllScripts()
+
+      expect(changed).toBe(1)
+      expect(scripts).toHaveLength(1)
+      expect(scripts[0]).toMatchObject({
+        uuid: 'same-script',
+        title: 'Newer',
+        content: 'new',
+        updatedAt: 2,
+      })
     })
   })
 })

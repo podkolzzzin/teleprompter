@@ -112,10 +112,20 @@ export async function upsertSyncedScripts(incomingScripts: Script[]): Promise<nu
   const db = await getDB()
   const localScripts = await db.getAll(STORE_NAME)
   const byUuid = new Map(localScripts.filter((script) => script.uuid).map((script) => [script.uuid, script]))
+  const incomingByUuid = new Map<string, Script>()
   let changed = 0
 
   for (const incoming of incomingScripts) {
     const uuid = incoming.uuid ?? createUuid()
+    const normalizedIncoming = { ...incoming, uuid }
+    const previousIncoming = incomingByUuid.get(uuid)
+    if (!previousIncoming || normalizedIncoming.updatedAt >= previousIncoming.updatedAt) {
+      incomingByUuid.set(uuid, normalizedIncoming)
+    }
+  }
+
+  for (const incoming of incomingByUuid.values()) {
+    const uuid = incoming.uuid!
     const existing = byUuid.get(uuid)
     const nextScript = {
       ...incoming,
@@ -125,7 +135,8 @@ export async function upsertSyncedScripts(incomingScripts: Script[]): Promise<nu
 
     if (!existing) {
       const { id: _id, ...scriptToAdd } = nextScript
-      await db.add(STORE_NAME, scriptToAdd)
+      const id = await db.add(STORE_NAME, scriptToAdd)
+      byUuid.set(uuid, { ...scriptToAdd, id: id as number })
       changed++
       continue
     }

@@ -301,7 +301,10 @@ function setupConnection(conn: DataConnection) {
   })
 
   conn.on('data', (raw) => {
-    handlePayload(raw as SyncPayload, conn)
+    void handlePayload(raw as SyncPayload, conn).catch((err: unknown) => {
+      error.value = err instanceof Error ? err.message : 'Account sync failed'
+      status.value = 'error'
+    })
   })
 
   conn.on('close', () => {
