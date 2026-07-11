@@ -62,7 +62,12 @@
       @touchcancel.passive="onControlsTouchCancel"
     >
       <!-- Timeline progress bar -->
-      <ScrollTimeline :progress="scrollProgress" :timeLeft="timeLeft" @seek="onTimelineSeek" />
+      <ScrollTimeline
+        :progress="scrollProgress"
+        :timeLeft="timeLeft"
+        @reset="resetTimeline"
+        @step="stepTimeline"
+      />
 
       <div class="mobile-adjustments" aria-label="Reading controls">
         <div class="mobile-control-row">
@@ -547,8 +552,23 @@ function updateTimelineProgress() {
   maybeScrollBroadcast()
 }
 
-function onTimelineSeek(progress: number) {
-  setDisplayedScrollTop(progress * getMaxScrollDistance())
+const TIMELINE_STEP_RATIO = 0.08
+
+function moveTimelineTo(offset: number) {
+  if (playing.value && !isVoiceSyncActive.value) {
+    pauseScroll()
+  }
+  setDisplayedScrollTop(offset)
+  scheduleSaveProgress()
+}
+
+function resetTimeline() {
+  moveTimelineTo(0)
+}
+
+function stepTimeline(direction: -1 | 1) {
+  const maxScroll = getMaxScrollDistance()
+  moveTimelineTo(getDisplayedScrollTop() + maxScroll * TIMELINE_STEP_RATIO * direction)
 }
 
 // Throttled broadcast of scroll progress to remote (at most once per 100 ms)

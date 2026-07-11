@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed } from 'vue'
 
 const props = defineProps<{
   /** Scroll progress from 0 to 1 */
@@ -9,34 +9,13 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  seek: [progress: number]
+  reset: []
+  step: [direction: -1 | 1]
 }>()
 
-const barEl = ref<HTMLElement | null>(null)
-const dragging = ref(false)
-
-function progressFromPointer(e: PointerEvent): number {
-  if (!barEl.value) return 0
-  const rect = barEl.value.getBoundingClientRect()
-  return Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
-}
-
-function onPointerDown(e: PointerEvent) {
-  dragging.value = true
-  emit('seek', progressFromPointer(e))
-  barEl.value?.setPointerCapture?.(e.pointerId)
-}
-
-function onPointerMove(e: PointerEvent) {
-  if (!dragging.value) return
-  emit('seek', progressFromPointer(e))
-}
-
-function onPointerUp(e: PointerEvent) {
-  if (!dragging.value) return
-  dragging.value = false
-  barEl.value?.releasePointerCapture?.(e.pointerId)
-}
+const clampedProgress = computed(() => Math.max(0, Math.min(1, props.progress)))
+const progressPercent = computed(() => Math.round(clampedProgress.value * 100))
+const progressStyle = computed(() => ({ width: `${clampedProgress.value * 100}%` }))
 
 function formatTime(seconds: number): string {
   const total = Math.max(0, Math.round(seconds))
@@ -47,22 +26,59 @@ function formatTime(seconds: number): string {
 </script>
 
 <template>
-  <div class="scroll-timeline">
-    <div
-      ref="barEl"
-      class="tl-bar"
-      @pointerdown.stop.prevent="onPointerDown"
-      @pointermove.stop="onPointerMove"
-      @pointerup.stop="onPointerUp"
-      title="Timeline — drag to seek"
-    >
-      <div class="tl-track">
-        <div class="tl-fill" :style="{ width: (progress * 100) + '%' }"></div>
+  <div class="scroll-timeline" aria-label="Script progress">
+    <div class="tl-controls">
+      <button
+        type="button"
+        class="tl-btn"
+        :disabled="clampedProgress <= 0"
+        aria-label="Jump backward"
+        title="Jump backward"
+        @click.stop="emit('step', -1)"
+      >
+        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M11 19l-7-7 7-7" />
+          <path d="M20 19l-7-7 7-7" />
+        </svg>
+      </button>
+
+      <div class="tl-meter" role="meter" aria-valuemin="0" aria-valuemax="100" :aria-valuenow="progressPercent">
+        <div class="tl-track">
+          <div class="tl-fill" :style="progressStyle"></div>
+        </div>
       </div>
-      <div class="tl-thumb" :style="{ left: (progress * 100) + '%' }"></div>
+
+      <button
+        type="button"
+        class="tl-btn"
+        :disabled="clampedProgress <= 0"
+        aria-label="Restart"
+        title="Restart"
+        @click.stop="emit('reset')"
+      >
+        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M3 12a9 9 0 1 0 3-6.7" />
+          <path d="M3 3v6h6" />
+        </svg>
+      </button>
+
+      <button
+        type="button"
+        class="tl-btn"
+        :disabled="clampedProgress >= 1"
+        aria-label="Jump forward"
+        title="Jump forward"
+        @click.stop="emit('step', 1)"
+      >
+        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M13 5l7 7-7 7" />
+          <path d="M4 5l7 7-7 7" />
+        </svg>
+      </button>
     </div>
+
     <div class="tl-labels">
-      <span class="tl-elapsed">{{ Math.round(progress * 100) }}%</span>
+      <span class="tl-elapsed">{{ progressPercent }}%</span>
       <span v-if="timeLeft >= 0" class="tl-time-left">{{ formatTime(timeLeft) }} left</span>
     </div>
   </div>
@@ -74,48 +90,53 @@ function formatTime(seconds: number): string {
   user-select: none;
 }
 
-.tl-bar {
-  position: relative;
-  height: 20px;
+.tl-controls {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) 34px 34px;
+  align-items: center;
+  gap: 8px;
+}
+
+.tl-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.86);
   cursor: pointer;
-  touch-action: none;
+  touch-action: manipulation;
+}
+
+.tl-btn:disabled {
+  cursor: default;
+  opacity: 0.35;
+}
+
+.tl-meter {
   display: flex;
   align-items: center;
+  min-width: 0;
+  height: 34px;
+  pointer-events: none;
 }
 
 .tl-track {
-  position: absolute;
-  left: 0;
-  right: 0;
-  height: 4px;
-  background: rgba(255, 255, 255, 0.15);
-  border-radius: 2px;
+  width: 100%;
+  height: 5px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
 }
 
 .tl-fill {
   height: 100%;
+  border-radius: inherit;
   background: var(--accent, #4ade80);
-  border-radius: 2px;
-  pointer-events: none;
-}
-
-.tl-thumb {
-  position: absolute;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: var(--accent, #4ade80);
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.15s, transform 0.1s;
-}
-
-.tl-bar:hover .tl-thumb,
-.tl-bar:active .tl-thumb {
-  opacity: 1;
-  transform: translate(-50%, -50%) scale(1.1);
 }
 
 .tl-labels {

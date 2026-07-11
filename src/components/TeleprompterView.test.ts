@@ -603,8 +603,9 @@ describe('TeleprompterView', () => {
       expect(wrapper.find('.loading').exists()).toBe(false)
     })
 
-    expect(wrapper.find('.tl-bar').exists()).toBe(true)
+    expect(wrapper.find('.tl-meter').exists()).toBe(true)
     expect(wrapper.find('.tl-fill').exists()).toBe(true)
+    expect(wrapper.findAll('.tl-btn')).toHaveLength(3)
   })
 
   it('timeline starts at 0%', async () => {
