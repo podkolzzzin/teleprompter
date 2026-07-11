@@ -33,6 +33,11 @@
       class="tp-scroll"
       :style="{ fontSize: fontSize + 'px' }"
       @click="onScrollClick"
+      @wheel="onScrollWheel"
+      @touchstart="onScrollTouchStart"
+      @touchmove="onScrollTouchMove"
+      @touchend="onScrollTouchEnd"
+      @touchcancel="onScrollTouchCancel"
     >
       <div
         ref="scrollTrackEl"
@@ -425,6 +430,9 @@ interface TeleprompterPageState {
 let restoringPageState = false
 let controlsTouchStartY: number | null = null
 let controlsTouchLastY: number | null = null
+let scrollTouchLastY: number | null = null
+let scrollTouchMoved = false
+let suppressNextScrollClick = false
 
 const rootEl = ref<HTMLElement | null>(null)
 const scrollEl = ref<HTMLElement | null>(null)
@@ -639,6 +647,17 @@ function setDisplayedScrollTop(offset: number) {
     return
   }
   setScrollOffset(nextOffset)
+}
+
+function scrollByManualDelta(deltaY: number) {
+  if (!Number.isFinite(deltaY) || deltaY === 0) return
+  if (playing.value && !isVoiceSyncActive.value) {
+    pauseScroll()
+  } else if (!isVoiceSyncActive.value) {
+    syncScrollPosition()
+  }
+  setDisplayedScrollTop(getDisplayedScrollTop() + deltaY)
+  scheduleSaveProgress()
 }
 
 function openShareModal() {
@@ -910,7 +929,49 @@ function handleKey(e: KeyboardEvent) {
 }
 
 function onScrollClick() {
+  if (suppressNextScrollClick) {
+    suppressNextScrollClick = false
+    return
+  }
   if (!editingFrame.value) togglePlay()
+}
+
+function onScrollWheel(event: WheelEvent) {
+  if (isVoiceSyncActive.value || !playing.value) return
+  event.preventDefault()
+  scrollByManualDelta(event.deltaY)
+}
+
+function onScrollTouchStart(event: TouchEvent) {
+  const touch = event.touches[0]
+  if (!touch) return
+  scrollTouchLastY = touch.clientY
+  scrollTouchMoved = false
+}
+
+function onScrollTouchMove(event: TouchEvent) {
+  const touch = event.touches[0]
+  if (!touch || scrollTouchLastY === null) return
+  const deltaY = scrollTouchLastY - touch.clientY
+  if (Math.abs(deltaY) > 2) {
+    scrollTouchMoved = true
+    suppressNextScrollClick = true
+  }
+  if (!isVoiceSyncActive.value && playing.value) {
+    event.preventDefault()
+    scrollByManualDelta(deltaY)
+  }
+  scrollTouchLastY = touch.clientY
+}
+
+function onScrollTouchEnd() {
+  if (!scrollTouchMoved) suppressNextScrollClick = false
+  onScrollTouchCancel()
+}
+
+function onScrollTouchCancel() {
+  scrollTouchLastY = null
+  scrollTouchMoved = false
 }
 
 function onControlsTouchStart(event: TouchEvent) {

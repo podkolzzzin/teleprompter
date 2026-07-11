@@ -738,6 +738,185 @@ describe('TeleprompterView', () => {
     expect(wrapper.find('.tp-root').classes()).not.toContain('controls-hidden')
   })
 
+  it('lets wheel scrolling control the timeline while playing', async () => {
+    const originalScrollHeight = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollHeight')
+    const originalClientHeight = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientHeight')
+    const originalScrollTop = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollTop')
+    let scrollTop = 0
+
+    try {
+      Object.defineProperties(HTMLElement.prototype, {
+        scrollHeight: {
+          configurable: true,
+          get() {
+            return this.classList?.contains('tp-scroll-track') ? 2000 : 0
+          },
+        },
+        clientHeight: {
+          configurable: true,
+          get() {
+            return this.classList?.contains('tp-scroll') ? 500 : 0
+          },
+        },
+        scrollTop: {
+          configurable: true,
+          get() {
+            return scrollTop
+          },
+          set(value: number) {
+            scrollTop = value
+          },
+        },
+      })
+
+      vi.mocked(getScript).mockResolvedValue({
+        id: 1,
+        title: 'Test',
+        content: 'Content',
+        createdAt: 1000,
+        updatedAt: 1000,
+      })
+
+      const router = createTestRouter()
+      await router.isReady()
+
+      const wrapper = mount(TeleprompterView, {
+        global: { plugins: [router] },
+      })
+
+      await vi.waitFor(() => {
+        expect(wrapper.find('.loading').exists()).toBe(false)
+      })
+
+      await wrapper.find('.play-btn').trigger('click')
+      await vi.waitFor(() => {
+        expect(wrapper.find('.tp-scroll-track').classes()).toContain('is-auto-scrolling')
+      })
+
+      wrapper.find('.tp-scroll').element.dispatchEvent(new WheelEvent('wheel', {
+        deltaY: 300,
+        bubbles: true,
+        cancelable: true,
+      }))
+      await nextTick()
+
+      expect(scrollTop).toBe(300)
+      expect(wrapper.find('.play-btn').attributes('title')).toBe('Play')
+      expect(wrapper.find('.tl-elapsed').text()).toBe('20%')
+    } finally {
+      if (originalScrollHeight) {
+        Object.defineProperty(HTMLElement.prototype, 'scrollHeight', originalScrollHeight)
+      } else {
+        Reflect.deleteProperty(HTMLElement.prototype, 'scrollHeight')
+      }
+      if (originalClientHeight) {
+        Object.defineProperty(HTMLElement.prototype, 'clientHeight', originalClientHeight)
+      } else {
+        Reflect.deleteProperty(HTMLElement.prototype, 'clientHeight')
+      }
+      if (originalScrollTop) {
+        Object.defineProperty(HTMLElement.prototype, 'scrollTop', originalScrollTop)
+      } else {
+        Reflect.deleteProperty(HTMLElement.prototype, 'scrollTop')
+      }
+    }
+  })
+
+  it('lets touch scrolling control the timeline while playing', async () => {
+    const originalScrollHeight = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollHeight')
+    const originalClientHeight = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientHeight')
+    const originalScrollTop = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollTop')
+    let scrollTop = 0
+
+    try {
+      Object.defineProperties(HTMLElement.prototype, {
+        scrollHeight: {
+          configurable: true,
+          get() {
+            return this.classList?.contains('tp-scroll-track') ? 2000 : 0
+          },
+        },
+        clientHeight: {
+          configurable: true,
+          get() {
+            return this.classList?.contains('tp-scroll') ? 500 : 0
+          },
+        },
+        scrollTop: {
+          configurable: true,
+          get() {
+            return scrollTop
+          },
+          set(value: number) {
+            scrollTop = value
+          },
+        },
+      })
+
+      vi.mocked(getScript).mockResolvedValue({
+        id: 1,
+        title: 'Test',
+        content: 'Content',
+        createdAt: 1000,
+        updatedAt: 1000,
+      })
+
+      const router = createTestRouter()
+      await router.isReady()
+
+      const wrapper = mount(TeleprompterView, {
+        global: { plugins: [router] },
+      })
+
+      await vi.waitFor(() => {
+        expect(wrapper.find('.loading').exists()).toBe(false)
+      })
+
+      await wrapper.find('.play-btn').trigger('click')
+      await vi.waitFor(() => {
+        expect(wrapper.find('.tp-scroll-track').classes()).toContain('is-auto-scrolling')
+      })
+
+      const scrollEl = wrapper.find('.tp-scroll')
+      scrollEl.element.dispatchEvent(new TouchEvent('touchstart', {
+        touches: [{ clientY: 500 } as Touch],
+        bubbles: true,
+        cancelable: true,
+      }))
+      scrollEl.element.dispatchEvent(new TouchEvent('touchmove', {
+        touches: [{ clientY: 125 } as Touch],
+        bubbles: true,
+        cancelable: true,
+      }))
+      scrollEl.element.dispatchEvent(new TouchEvent('touchend', {
+        bubbles: true,
+        cancelable: true,
+      }))
+      await nextTick()
+      await scrollEl.trigger('click')
+
+      expect(scrollTop).toBe(375)
+      expect(wrapper.find('.play-btn').attributes('title')).toBe('Play')
+      expect(wrapper.find('.tl-elapsed').text()).toBe('25%')
+    } finally {
+      if (originalScrollHeight) {
+        Object.defineProperty(HTMLElement.prototype, 'scrollHeight', originalScrollHeight)
+      } else {
+        Reflect.deleteProperty(HTMLElement.prototype, 'scrollHeight')
+      }
+      if (originalClientHeight) {
+        Object.defineProperty(HTMLElement.prototype, 'clientHeight', originalClientHeight)
+      } else {
+        Reflect.deleteProperty(HTMLElement.prototype, 'clientHeight')
+      }
+      if (originalScrollTop) {
+        Object.defineProperty(HTMLElement.prototype, 'scrollTop', originalScrollTop)
+      } else {
+        Reflect.deleteProperty(HTMLElement.prototype, 'scrollTop')
+      }
+    }
+  })
+
   it('restores latest teleprompter page state after reload', async () => {
     const originalScrollHeight = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollHeight')
     const originalClientHeight = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientHeight')
