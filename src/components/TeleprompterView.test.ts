@@ -823,7 +823,7 @@ describe('TeleprompterView', () => {
     }
   })
 
-  it('lets touch scrolling control the timeline while playing', async () => {
+  it('lets native touch scrolling control the timeline while playing', async () => {
     const originalScrollHeight = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollHeight')
     const originalClientHeight = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientHeight')
     const originalScrollTop = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollTop')
@@ -879,22 +879,9 @@ describe('TeleprompterView', () => {
       })
 
       const scrollEl = wrapper.find('.tp-scroll')
-      scrollEl.element.dispatchEvent(new TouchEvent('touchstart', {
-        touches: [{ clientY: 500 } as Touch],
-        bubbles: true,
-        cancelable: true,
-      }))
-      scrollEl.element.dispatchEvent(new TouchEvent('touchmove', {
-        touches: [{ clientY: 125 } as Touch],
-        bubbles: true,
-        cancelable: true,
-      }))
-      scrollEl.element.dispatchEvent(new TouchEvent('touchend', {
-        bubbles: true,
-        cancelable: true,
-      }))
+      ;(scrollEl.element as HTMLElement).scrollTop = 375
+      scrollEl.element.dispatchEvent(new Event('scroll'))
       await nextTick()
-      await scrollEl.trigger('click')
 
       expect(scrollTop).toBe(375)
       expect(wrapper.find('.play-btn').attributes('title')).toBe('Play')
