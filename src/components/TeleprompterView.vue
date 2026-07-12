@@ -1097,6 +1097,8 @@ function positionPopup(e: Event) {
 .tp-root {
   position: fixed;
   inset: 0;
+  width: 100%;
+  max-width: 100%;
   background: #000;
   display: flex;
   flex-direction: column;
@@ -1142,6 +1144,7 @@ function positionPopup(e: Event) {
 
 .tp-scroll {
   flex: 1;
+  min-width: 0;
   overflow-y: auto;
   overflow-x: hidden;
   cursor: pointer;
@@ -1197,6 +1200,10 @@ function positionPopup(e: Event) {
   bottom: 0;
   left: 0;
   right: 0;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
   background: linear-gradient(transparent, rgba(0, 0, 0, 0.9));
   padding: 16px 16px 16px;
   transition: opacity 0.3s, transform 0.3s;
@@ -1220,6 +1227,7 @@ function positionPopup(e: Event) {
   display: flex;
   align-items: center;
   gap: 4px;
+  width: 100%;
   max-width: 900px;
   margin: 0 auto;
   flex-wrap: nowrap;
@@ -1841,6 +1849,7 @@ function positionPopup(e: Event) {
   .mobile-adjustments {
     display: grid;
     gap: 8px;
+    width: 100%;
     max-width: 900px;
     margin: 0 auto 10px;
     pointer-events: auto;
@@ -2032,7 +2041,7 @@ function positionPopup(e: Event) {
     justify-content: center;
   }
   .speed-popup {
-    width: calc(100vw - 24px);
+    width: calc(100% - 24px);
     padding: 18px;
   }
   .speed-slider {
