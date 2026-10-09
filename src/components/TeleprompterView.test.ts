@@ -136,7 +136,7 @@ describe('TeleprompterView', () => {
     expect(playBtn.attributes('title')).toBe('Play')
   })
 
-  it('keeps the screen awake only while playing', async () => {
+  it('keeps the screen awake with a loaded script, including while paused', async () => {
     vi.mocked(getScript).mockResolvedValue({
       id: 1,
       title: 'Test',
@@ -169,19 +169,18 @@ describe('TeleprompterView', () => {
 
     await vi.waitFor(() => {
       expect(wrapper.find('.loading').exists()).toBe(false)
-    })
-
-    await wrapper.find('.play-btn').trigger('click')
-    await vi.waitFor(() => {
       expect(request).toHaveBeenCalledWith('screen')
     })
 
     await wrapper.find('.play-btn').trigger('click')
+    await wrapper.find('.play-btn').trigger('click')
+    expect(release).not.toHaveBeenCalled()
+    expect(request).toHaveBeenCalledOnce()
+
+    wrapper.unmount()
     await vi.waitFor(() => {
       expect(release).toHaveBeenCalledOnce()
     })
-
-    wrapper.unmount()
   })
 
   it('adds space before the first line of text', async () => {
