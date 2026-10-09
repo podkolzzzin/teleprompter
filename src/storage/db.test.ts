@@ -42,7 +42,9 @@ vi.mock('idb', () => ({
 
 import {
   deleteScript,
+  deleteScriptsByUuid,
   getAllScripts,
+  getDeletedScripts,
   getScript,
   saveScript,
   updateScript,
@@ -54,6 +56,7 @@ describe('storage/db', () => {
   beforeEach(() => {
     mockStore.clear()
     autoId = 0
+    localStorage.clear()
   })
 
   describe('saveScript', () => {
@@ -159,6 +162,8 @@ describe('storage/db', () => {
   })
 
   describe('upsertSyncedScripts', () => {
+    const stale = { uuid: 'offline-script', title: 'Offline copy', content: 'old', createdAt: 1, updatedAt: 10 }
+
     it('deduplicates incoming scripts by uuid before inserting', async () => {
       const changed = await upsertSyncedScripts([
         { uuid: 'same-script', title: 'Older', content: 'old', createdAt: 1, updatedAt: 1 },
@@ -175,6 +180,78 @@ describe('storage/db', () => {
         content: 'new',
         updatedAt: 2,
       })
+    })
+
+    it('keeps a local deletion when an offline peer replays an unknown UUID', async () => {
+      const id = await saveScript(stale)
+      await deleteScript(id)
+      const deletion = getDeletedScripts()[0]
+
+      expect(await upsertSyncedScripts([stale])).toBe(0)
+      expect(await getAllScripts()).toEqual([])
+      expect(getDeletedScripts()).toEqual([deletion])
+    })
+
+    it('persists an unknown remote tombstone and its original timestamp', async () => {
+      const deletion = { uuid: stale.uuid, deletedAt: 20 }
+
+      expect(await deleteScriptsByUuid([deletion])).toBe(0)
+      expect(getDeletedScripts()).toEqual([deletion])
+      expect(await upsertSyncedScripts([stale])).toBe(0)
+      expect(await getAllScripts()).toEqual([])
+    })
+
+    it('preserves a remote deletion version when removing an existing script', async () => {
+      await upsertSyncedScripts([stale])
+      const deletion = { uuid: stale.uuid, deletedAt: 20 }
+
+      expect(await deleteScriptsByUuid([deletion])).toBe(1)
+      expect(getDeletedScripts()).toEqual([deletion])
+    })
+
+    it('converges when stale scripts and tombstones arrive in either order', async () => {
+      const deletion = { uuid: stale.uuid, deletedAt: 20 }
+
+      await upsertSyncedScripts([stale])
+      expect(await deleteScriptsByUuid([deletion])).toBe(1)
+      expect(await upsertSyncedScripts([stale])).toBe(0)
+
+      localStorage.clear()
+      mockStore.clear()
+      await deleteScriptsByUuid([deletion])
+      expect(await upsertSyncedScripts([stale])).toBe(0)
+      expect(await getAllScripts()).toEqual([])
+      expect(getDeletedScripts()).toEqual([deletion])
+    })
+
+    it('retains the newest deletion version despite reordered remote tombstones', async () => {
+      await deleteScriptsByUuid([{ uuid: stale.uuid, deletedAt: 30 }])
+      await deleteScriptsByUuid([{ uuid: stale.uuid, deletedAt: 20 }])
+
+      expect(getDeletedScripts()).toEqual([{ uuid: stale.uuid, deletedAt: 30 }])
+      expect(await upsertSyncedScripts([{ ...stale, updatedAt: 25 }])).toBe(0)
+      expect(await getAllScripts()).toEqual([])
+    })
+
+    it('allows a newer valid edit after deletion while rejecting its old version', async () => {
+      await deleteScriptsByUuid([{ uuid: stale.uuid, deletedAt: 20 }])
+      const newer = { ...stale, title: 'New edit', updatedAt: 21 }
+
+      expect(await upsertSyncedScripts([stale, newer])).toBe(1)
+      expect((await getAllScripts())[0].title).toBe('New edit')
+      expect(await deleteScriptsByUuid([{ uuid: stale.uuid, deletedAt: 20 }])).toBe(0)
+      expect((await getAllScripts())[0].title).toBe('New edit')
+    })
+
+    it('keeps a tombstone across module reloads', async () => {
+      const deletion = { uuid: stale.uuid, deletedAt: 20 }
+      await deleteScriptsByUuid([deletion])
+      vi.resetModules()
+      const reloaded = await import('./db')
+
+      expect(reloaded.getDeletedScripts()).toEqual([deletion])
+      expect(await reloaded.upsertSyncedScripts([stale])).toBe(0)
+      expect(await reloaded.getAllScripts()).toEqual([])
     })
   })
 })

@@ -39,9 +39,14 @@ function writeDeletedScripts(deletedScripts: DeletedScript[]) {
   localStorage.setItem(DELETED_SCRIPTS_KEY, JSON.stringify(deletedScripts))
 }
 
-function recordDeletedScript(uuid: string) {
-  const existing = readDeletedScripts().filter((script) => script.uuid !== uuid)
-  writeDeletedScripts([...existing, { uuid, deletedAt: Date.now() }])
+function recordDeletedScript(uuid: string, deletedAt: number) {
+  const deletedScripts = readDeletedScripts()
+  const previous = deletedScripts.find((script) => script.uuid === uuid)
+  if (previous && previous.deletedAt >= deletedAt) return
+  writeDeletedScripts([
+    ...deletedScripts.filter((script) => script.uuid !== uuid),
+    { uuid, deletedAt },
+  ])
 }
 
 async function getDB() {
@@ -95,7 +100,7 @@ export async function updateScript(script: Script): Promise<void> {
 export async function deleteScript(id: number): Promise<void> {
   const db = await getDB()
   const script = await db.get(STORE_NAME, id)
-  if (script?.uuid) recordDeletedScript(script.uuid)
+  if (script?.uuid) recordDeletedScript(script.uuid, Math.max(Date.now(), script.updatedAt))
   await db.delete(STORE_NAME, id)
 }
 
@@ -111,6 +116,7 @@ export async function updateScrollProgress(id: number, progress: number): Promis
 export async function upsertSyncedScripts(incomingScripts: Script[]): Promise<number> {
   const db = await getDB()
   const localScripts = await db.getAll(STORE_NAME)
+  const deletedByUuid = new Map(readDeletedScripts().map((script) => [script.uuid, script.deletedAt]))
   const byUuid = new Map(localScripts.filter((script) => script.uuid).map((script) => [script.uuid, script]))
   const incomingByUuid = new Map<string, Script>()
   let changed = 0
@@ -126,6 +132,8 @@ export async function upsertSyncedScripts(incomingScripts: Script[]): Promise<nu
 
   for (const incoming of incomingByUuid.values()) {
     const uuid = incoming.uuid!
+    // A deletion wins ties; only a strictly newer edit can restore this UUID.
+    if ((deletedByUuid.get(uuid) ?? -Infinity) >= incoming.updatedAt) continue
     const existing = byUuid.get(uuid)
     const nextScript = {
       ...incoming,
@@ -156,17 +164,19 @@ export function getDeletedScripts(): DeletedScript[] {
 
 export async function deleteScriptsByUuid(deletedScripts: DeletedScript[]): Promise<number> {
   if (deletedScripts.length === 0) return 0
+  for (const { uuid, deletedAt } of deletedScripts) {
+    recordDeletedScript(uuid, deletedAt)
+  }
   const db = await getDB()
   const localScripts = await db.getAll(STORE_NAME)
-  const deletedByUuid = new Map(deletedScripts.map((script) => [script.uuid, script]))
+  const deletedByUuid = new Map(readDeletedScripts().map((script) => [script.uuid, script.deletedAt]))
   let changed = 0
 
   for (const script of localScripts) {
     if (!script.id || !script.uuid) continue
-    const deleted = deletedByUuid.get(script.uuid)
-    if (deleted && deleted.deletedAt >= script.updatedAt) {
+    const deletedAt = deletedByUuid.get(script.uuid)
+    if (deletedAt !== undefined && deletedAt >= script.updatedAt) {
       await db.delete(STORE_NAME, script.id)
-      recordDeletedScript(script.uuid)
       changed++
     }
   }

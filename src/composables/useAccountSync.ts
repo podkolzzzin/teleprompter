@@ -68,6 +68,7 @@ let peerReconnectTimer: ReturnType<typeof setTimeout> | null = null
 let started = false
 let peerReady = false
 let peerReconnectAttempts = 0
+let payloadQueue: Promise<void> = Promise.resolve()
 
 const connections = reactive(new Map<string, DataConnection>())
 const pendingDeviceIds = new Set<string>()
@@ -301,7 +302,7 @@ function setupConnection(conn: DataConnection) {
   })
 
   conn.on('data', (raw) => {
-    void handlePayload(raw as SyncPayload, conn).catch((err: unknown) => {
+    payloadQueue = payloadQueue.then(() => handlePayload(raw as SyncPayload, conn)).catch((err: unknown) => {
       error.value = err instanceof Error ? err.message : 'Account sync failed'
       status.value = 'error'
     })
