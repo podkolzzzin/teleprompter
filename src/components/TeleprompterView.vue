@@ -406,6 +406,7 @@ const router = useRouter()
 const route = useRoute()
 
 const loading = ref(true)
+const scriptLoaded = ref(false)
 const rawContent = ref('')
 const playing = ref(false)
 const flipVertically = ref(false)
@@ -415,7 +416,7 @@ const showShareModal = ref(false)
 const { speed, fontSize, mirror, focusOpacity, areaWidth, areaOffsetX } = useTeleprompterSettings()
 const { orientation, orientationClass, setOrientation } = useDisplayOrientation()
 
-useWakeLock(playing)
+useWakeLock(scriptLoaded)
 
 const PAGE_STATE_KEY = 'teleprompter-page-state'
 
@@ -846,6 +847,7 @@ onMounted(async () => {
     if (script) {
       scriptTitle.value = script.title || 'Untitled'
       rawContent.value = script.content
+      scriptLoaded.value = true
       await nextTick()
       if (scrollEl.value) {
         const pageState = readPageState(id)
